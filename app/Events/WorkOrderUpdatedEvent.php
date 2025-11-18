@@ -2,7 +2,7 @@
 
 namespace App\Events;
 
-use App\Models\PHC;
+use App\Models\WorkOrder;
 use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Broadcasting\PrivateChannel;
@@ -11,38 +11,39 @@ use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 
-class PhcCreatedEvent implements ShouldBroadcastNow
+class WorkOrderUpdatedEvent implements ShouldBroadcastNow
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
-    public $phc;
+    public $workOrder;
     public $userIds;
 
-    public function __construct(PHC $phc, array $userIds)
+    public function __construct(WorkOrder $workOrder, array $userIds)
     {
-        $this->phc = $phc;
+        $this->workOrder = $workOrder;
         $this->userIds = $userIds;
     }
 
     public function broadcastOn()
     {
-        return new Channel('phc.created'); // ✅ public channel
+        return new Channel('workorder.updated'); // ✅ public channel
     }
 
     public function broadcastAs(): string
     {
-        return 'phc.created';
+        return 'workorder.updated';
     }
 
     public function broadcastWith(): array
     {
-        $projectNumber = $this->phc->project ? $this->phc->project->project_number : 'Unknown';
+        $projectNumber = $this->workOrder->project ? $this->workOrder->project->project_number : 'Unknown';
         return [
-            'phc_id' => $this->phc->id,
-            'status' => $this->phc->status,
+            'work_order_id' => $this->workOrder->id,
+            'status' => $this->workOrder->status,
             'user_ids' => $this->userIds,
-            'message' => "PHC for project {$projectNumber} has been created.",
+            'message' => "Work Order for project {$projectNumber} has been updated.",
             'created_at' => now()->toISOString(),
+            'title' => 'Work Order Updated'
         ];
     }
 }

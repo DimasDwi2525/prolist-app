@@ -28,6 +28,12 @@ class EventServiceProvider extends ServiceProvider
         \App\Events\LogCreatedEvent::class => [
             \App\Listeners\SendLogCreatedNotification::class,
         ],
+        \App\Events\WorkOrderCreatedEvent::class => [
+            \App\Listeners\SendWorkOrderCreatedNotification::class,
+        ],
+        \App\Events\WorkOrderUpdatedEvent::class => [
+            \App\Listeners\SendWorkOrderUpdatedNotification::class,
+        ],
     ];
 
 

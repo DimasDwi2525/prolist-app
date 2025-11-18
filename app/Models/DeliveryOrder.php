@@ -19,7 +19,7 @@ class DeliveryOrder extends Model
         'do_description',
         'pn_id',
         'return_date',
-        'invoice_no',
+        'invoice_id',
         'do_send',
     ];
 

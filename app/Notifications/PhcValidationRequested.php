@@ -3,15 +3,12 @@
 namespace App\Notifications;
 
 use App\Models\PHC;
-use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\BroadcastMessage;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
-class PhcValidationRequested extends Notification implements ShouldQueue
+class PhcValidationRequested extends Notification
 {
-   use Queueable;
 
     protected $phc;
 
@@ -22,16 +19,18 @@ class PhcValidationRequested extends Notification implements ShouldQueue
 
     public function via($notifiable)
     {
-        return ['database', 'broadcast']; // ✅ simpan ke DB + broadcast realtime
+        return ['database', 'broadcast']; // ✅ simpan ke DB + broadcast realtime public
     }
 
     public function toDatabase($notifiable)
     {
         return [
             'title' => 'PHC Validation Requested',
-            'message' => "A new PHC has been created for Project {$this->phc->project->project_name}",
+            'message' => "A new PHC has been created for Project {$this->phc->project->project_number}",
             'phc_id'  => $this->phc->id,
-            'project' => $this->phc->project->project_number,
+            'project_number' => $this->phc->project->project_number,
+            'pn_number' => $this->phc->project->pn_number,
+            'type' => 'phc'
         ];
     }
 
@@ -40,9 +39,11 @@ class PhcValidationRequested extends Notification implements ShouldQueue
         return [
             'data' => [
                 'title' => 'PHC Validation Requested',
-                'message' => "A new PHC has been created for Project {$this->phc->project->project_name}",
+                'message' => "A new PHC has been created for Project {$this->phc->project->project_number}",
                 'phc_id'  => $this->phc->id,
-                'project' => $this->phc->project->project_number,
+                'project_number' => $this->phc->project->project_number,
+                'pn_number' => $this->phc->project->pn_number,
+                'type' => 'phc'
             ],
         ];
     }

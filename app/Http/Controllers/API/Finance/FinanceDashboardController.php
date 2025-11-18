@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\API\Finance;
 
 use App\Http\Controllers\Controller;
+use App\Models\DeliveryOrder;
 use App\Models\Invoice;
 use App\Models\Project;
 use App\Models\RequestInvoice;
@@ -38,6 +39,9 @@ class FinanceDashboardController extends Controller
 
         // Jumlah PN (projects)
         $projectCount = Project::count();
+
+        // Total delivery order count
+        $totalDeliveryOrder = DeliveryOrder::count();
 
         // Total invoice value
         $totalInvoice = Invoice::sum('total_invoice');
@@ -80,6 +84,7 @@ class FinanceDashboardController extends Controller
             'request_invoice' => $requestInvoiceCount,
             'request_invoice_list' => $requestInvoiceList,
             'jumlah_pn' => $projectCount,
+            'total_delivery_order' => $totalDeliveryOrder,
             'total_invoice' => $totalInvoice,
             'invoice_outstanding' => $invoiceOutstanding,
             'invoice_due_count' => $invoiceDueCount,

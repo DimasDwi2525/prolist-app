@@ -11,7 +11,16 @@ class NotificationController extends Controller
     public function index(Request $request)
     {
         return response()->json([
-            'notifications' => $request->user()->unreadNotifications
+            'notifications' => $request->user()->unreadNotifications->map(function ($notification) {
+                return [
+                    'id' => $notification->id,
+                    'type' => $notification->type,
+                    'data' => $notification->data,
+                    'read_at' => $notification->read_at,
+                    'created_at' => $notification->created_at,
+                    'updated_at' => $notification->updated_at,
+                ];
+            })
         ]);
     }
 
@@ -19,7 +28,16 @@ class NotificationController extends Controller
     public function all(Request $request)
     {
         return response()->json([
-            'notifications' => $request->user()->notifications
+            'notifications' => $request->user()->notifications->map(function ($notification) {
+                return [
+                    'id' => $notification->id,
+                    'type' => $notification->type,
+                    'data' => $notification->data,
+                    'read_at' => $notification->read_at,
+                    'created_at' => $notification->created_at,
+                    'updated_at' => $notification->updated_at,
+                ];
+            })
         ]);
     }
 
@@ -31,28 +49,33 @@ class NotificationController extends Controller
         ]);
     }
 
-    // Mark specific notification as read (delete it)
+    // Mark specific notification as read
     public function markAsRead(Request $request, $id)
     {
+        // Delete notifications older than 7 days
+        $request->user()->notifications()->where('created_at', '<', now()->subDays(7))->delete();
+
         $notification = $request->user()
             ->unreadNotifications()
-            ->where('id', $id)
-            ->first();
+            ->find($id);
 
         if ($notification) {
-            $notification->delete();
-            return response()->json(['message' => 'Notification deleted']);
+            $notification->update(['read_at' => now()]);
+            return response()->json(['message' => 'Notification marked as read']);
         }
 
         return response()->json(['message' => 'Notification not found or already read'], 404);
     }
 
-    // Mark all notifications as read (delete them)
+    // Mark all notifications as read
     public function markAllAsRead(Request $request)
     {
-        $request->user()->unreadNotifications()->delete();
+        // Delete notifications older than 7 days
+        $request->user()->notifications()->where('created_at', '<', now()->subDays(7))->delete();
 
-        return response()->json(['message' => 'All notifications deleted']);
+        $request->user()->unreadNotifications()->update(['read_at' => now()]);
+
+        return response()->json(['message' => 'All notifications marked as read']);
     }
 
     // Delete a specific notification
@@ -60,8 +83,7 @@ class NotificationController extends Controller
     {
         $notification = $request->user()
             ->notifications()
-            ->where('id', $id)
-            ->first();
+            ->find($id);
 
         if ($notification) {
             $notification->delete();

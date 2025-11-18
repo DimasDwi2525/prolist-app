@@ -29,7 +29,7 @@ class RequestInvoiceCreated extends Notification implements ShouldQueue
     {
         return [
             'title' => 'Request Invoice Created',
-            'message' => "A new Request Invoice has been created for Project {$this->requestInvoice->project->project_name}",
+            'message' => "A new Request Invoice has been created for Project {$this->requestInvoice->project->project_number}",
             'request_invoice_id' => $this->requestInvoice->id,
             'project' => $this->requestInvoice->project->project_number,
             'request_number' => $this->requestInvoice->request_number,
@@ -41,7 +41,7 @@ class RequestInvoiceCreated extends Notification implements ShouldQueue
         return [
             'data' => [
                 'title' => 'Request Invoice Created',
-                'message' => "A new Request Invoice has been created for Project {$this->requestInvoice->project->project_name}",
+                'message' => "A new Request Invoice has been created for Project {$this->requestInvoice->project->project_number}",
                 'request_invoice_id' => $this->requestInvoice->id,
                 'project' => $this->requestInvoice->project->project_number,
                 'request_number' => $this->requestInvoice->request_number,

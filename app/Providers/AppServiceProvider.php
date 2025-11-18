@@ -32,5 +32,8 @@ class AppServiceProvider extends ServiceProvider
 
         // Register LogObserver
         \App\Models\Log::observe(\App\Observers\LogObserver::class);
+
+        // Register WorkOrderObserver
+        \App\Models\WorkOrder::observe(\App\Observers\WorkOrderObserver::class);
     }
 }

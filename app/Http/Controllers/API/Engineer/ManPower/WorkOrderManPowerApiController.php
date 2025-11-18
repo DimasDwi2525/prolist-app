@@ -144,8 +144,8 @@ class WorkOrderManPowerApiController extends Controller
             for ($i = 0; $i < $woCount; $i++) {
                 $woData = $data;
                 $woData['wo_date'] = $baseDate->copy()->addDays($i);
-                // $woData['status'] = WorkOrder::STATUS_WAITING_APPROVAL;
-                $woData['status'] = WorkOrder::STATUS_FINISHED;
+                $woData['status'] = WorkOrder::STATUS_WAITING_APPROVAL;
+                // $woData['status'] = WorkOrder::STATUS_FINISHED;
 
                 $lastInProject = WorkOrder::where('project_id', $data['project_id'])
                     ->max('wo_number_in_project');
@@ -228,18 +228,18 @@ class WorkOrderManPowerApiController extends Controller
                 ]);
 
                 // Buat approval untuk role tertentu
-                // $approvalRoles = ['project manager', 'engineering_director'];
-                // $users = User::whereHas('role', fn($q) => $q->whereIn('name', $approvalRoles))->get();
+                $approvalRoles = ['project manager'];
+                $users = User::whereHas('role', fn($q) => $q->whereIn('name', $approvalRoles))->get();
 
-                // foreach ($users as $user) {
-                //     Approval::create([
-                //         'approvable_type' => WorkOrder::class,
-                //         'approvable_id'   => $wo->id,
-                //         'user_id'         => $user->id,
-                //         'status'          => 'pending',
-                //         'type'            => 'Work Order',
-                //     ]);
-                // }
+                foreach ($users as $user) {
+                    Approval::create([
+                        'approvable_type' => WorkOrder::class,
+                        'approvable_id'   => $wo->id,
+                        'user_id'         => $user->id,
+                        'status'          => 'pending',
+                        'type'            => 'Work Order',
+                    ]);
+                }
 
                 $results[] = $wo->load(['pics.user', 'pics.role', 'descriptions', 'purpose']);
             }
@@ -338,7 +338,37 @@ class WorkOrderManPowerApiController extends Controller
             'material_required' => 'nullable|string',
         ]);
 
-        DB::transaction(function () use ($workOrder, $data) {
+        // Deteksi perubahan pada fields tertentu
+        $hasChanges = false;
+
+        if (isset($data['wo_date']) && $data['wo_date'] != $workOrder->wo_date->format('Y-m-d')) {
+            $hasChanges = true;
+        }
+
+        if (isset($data['pics'])) {
+            $currentPics = $workOrder->pics->map(fn($p) => ['user_id' => $p->user_id, 'role_id' => $p->role_id])->sortBy(['user_id', 'role_id'])->values()->toArray();
+            $newPics = collect($data['pics'])->sortBy(['user_id', 'role_id'])->values()->toArray();
+            if ($currentPics != $newPics) {
+                $hasChanges = true;
+            }
+        }
+
+        if (isset($data['descriptions'])) {
+            $currentDescs = $workOrder->descriptions->pluck('description')->sort()->values()->toArray();
+            $newDescs = collect($data['descriptions'])->pluck('description')->sort()->values()->toArray();
+            if ($currentDescs != $newDescs) {
+                $hasChanges = true;
+            }
+
+            // Deteksi perubahan pada result
+            $currentResults = $workOrder->descriptions->pluck('result')->sort()->values()->toArray();
+            $newResults = collect($data['descriptions'])->pluck('result')->sort()->values()->toArray();
+            if ($currentResults != $newResults) {
+                $hasChanges = true;
+            }
+        }
+
+        DB::transaction(function () use ($workOrder, $data, $hasChanges) {
             // Update Work Order utama
             $workOrder->update(Arr::except($data, ['pics', 'descriptions']));
 
@@ -355,7 +385,10 @@ class WorkOrderManPowerApiController extends Controller
                 $descriptions = collect($data['descriptions'])->map(function ($desc) use ($workOrder) {
                     return [
                         'description' => $desc['description'] ?? null,
-                        'result' => $desc['result'] ?? null,
+                        // boleh isi result kalau status WAITING CLIENT APPROVAL atau APPROVED
+                        'result'      => in_array($workOrder->status, [WorkOrder::STATUS_WAITING_CLIENT, WorkOrder::STATUS_APPROVED])
+                                            ? ($desc['result'] ?? null)
+                                            : null,
                     ];
                 })->toArray();
 
@@ -389,7 +422,29 @@ class WorkOrderManPowerApiController extends Controller
                     'total_mandays_eng'   => $totalEng,
                     'total_mandays_elect' => $totalElect,
                 ]);
-            $workOrder->update(['status' => WorkOrder::STATUS_FINISHED]);
+
+            // Jika ada perubahan dan status approved, kirim approval baru
+            if ($hasChanges && $workOrder->status === WorkOrder::STATUS_APPROVED) {
+                $approvalRoles = ['project manager', 'engineering_director'];
+                $users = User::whereHas('role', fn($q) => $q->whereIn('name', $approvalRoles))->get();
+
+                foreach ($users as $user) {
+                    Approval::create([
+                        'approvable_type' => WorkOrder::class,
+                        'approvable_id'   => $workOrder->id,
+                        'user_id'         => $user->id,
+                        'status'          => 'pending',
+                        'type'            => 'Work Order Update',
+                    ]);
+                }
+
+                $workOrder->update(['status' => WorkOrder::STATUS_WAITING_CLIENT]);
+
+                // Fire event for real-time notification
+                $userIds = $users->pluck('id')->toArray();
+                event(new \App\Events\WorkOrderUpdatedEvent($workOrder, $userIds));
+            }
+
         });
 
         return response()->json([

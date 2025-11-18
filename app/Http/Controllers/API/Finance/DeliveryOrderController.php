@@ -15,13 +15,7 @@ class DeliveryOrderController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $pnId = $request->query('pn_id');
-        if (!$pnId) {
-            return response()->json(['error' => 'pn_id is required'], 400);
-        }
-
-        $deliveryOrders = DeliveryOrder::where('pn_id', $pnId)
-            ->with('project')
+        $deliveryOrders = DeliveryOrder::with('project')
             ->orderBy('created_at', 'desc')
             ->get();
 
@@ -37,7 +31,7 @@ class DeliveryOrderController extends Controller
             'do_description' => 'nullable|string',
             'pn_id' => 'required|integer|exists:projects,pn_number',
             'return_date' => 'nullable|date',
-            'invoice_no' => 'nullable|string',
+            'invoice_id' => 'nullable|integer|exists:invoices,id',
             'do_send' => 'nullable|date',
         ]);
 
@@ -88,7 +82,7 @@ class DeliveryOrderController extends Controller
             'do_description' => 'nullable|string',
             'pn_id' => 'sometimes|required|integer|exists:projects,pn_number',
             'return_date' => 'nullable|date',
-            'invoice_no' => 'nullable|string',
+            'invoice_id' => 'nullable|integer|exists:invoices,id',
             'do_send' => 'nullable|date',
         ]);
 

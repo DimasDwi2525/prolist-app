@@ -28,9 +28,11 @@ class PhcCreated extends Notification implements ShouldQueue
     public function toDatabase($notifiable)
     {
         return [
-            'message' => "PHC berhasil dibuat untuk Project {$this->phc->project->project_name}",
+            'message' => "PHC berhasil dibuat untuk Project {$this->phc->project->project_number}",
             'phc_id'  => $this->phc->id,
-            'project' => $this->phc->project->project_number,
+            'project_number' => $this->phc->project->project_number,
+            'pn_number' => $this->phc->project->pn_number,
+            'type' => 'phc'
         ];
     }
 
@@ -38,9 +40,11 @@ class PhcCreated extends Notification implements ShouldQueue
     {
         return [
             'data' => [
-                'message' => "PHC berhasil dibuat untuk Project {$this->phc->project->project_name}",
+                'message' => "PHC berhasil dibuat untuk Project {$this->phc->project->project_number}",
                 'phc_id'  => $this->phc->id,
-                'project' => $this->phc->project->project_number,
+                'project_number' => $this->phc->project->project_number,
+                'pn_number' => $this->phc->project->pn_number,
+                'type' => 'phc'
             ],
         ];
     }
