@@ -93,15 +93,17 @@ class ManPowerDashboardApiController extends Controller
         $count = $query->count();
 
         $listQuery = clone $query;
-        $list = $listQuery->with(['statusProject', 'phc'])
+        $list = $listQuery->with(['statusProject', 'phc', 'client', 'quotation'])
             ->get()
             ->map(function ($p) {
                 return [
-                    'pn_number'    => $p->pn_number,
-                    'project_name' => $p->project_name,
-                    'target_dates' => $p->phc->target_finish_date,
-                    'status'       => $p->statusProject->name ?? '-',
-                    'pic'          => $p->phc?->picEngineering?->name ?? '-',
+                    'pn_number'     => $p->pn_number,
+                    'project_number' => $p->project_number,
+                    'project_name'  => $p->project_name,
+                    'client_name'   => $p->client->name ?? $p->quotation->client->name ?? '-',
+                    'target_dates'  => $p->phc->target_finish_date,
+                    'status'        => $p->statusProject->name ?? '-',
+                    'pic'           => $p->phc?->picEngineering?->name ?? '-',
                 ];
             });
 
@@ -121,15 +123,17 @@ class ManPowerDashboardApiController extends Controller
             ->whereHas('statusProject', function($q) {
                 $q->whereNotIn('name', ['Engineering Work Completed', 'Project Finished', 'Invoice On Progress', 'Documents Completed', 'Cancelled']);
             })
-            ->with(['statusProject', 'phc'])
+            ->with(['statusProject', 'phc', 'client', 'quotation'])
             ->get()
             ->sortBy('phc.target_finish_date')
             ->map(function ($p) {
                 return [
-                    'pn_number'    => $p->pn_number,
-                    'project_name' => $p->project_name,
-                    'target_dates' => $p->phc->target_finish_date,
-                    'status'       => $p->statusProject->name ?? '-',
+                    'pn_number'     => $p->pn_number,
+                    'project_number' => $p->project_number,
+                    'project_name'  => $p->project_name,
+                    'client_name'   => $p->client->name ?? $p->quotation->client->name ?? '-',
+                    'target_dates'  => $p->phc->target_finish_date,
+                    'status'        => $p->statusProject->name ?? '-',
                 ];
             });
 
@@ -142,15 +146,17 @@ class ManPowerDashboardApiController extends Controller
             ->whereHas('statusProject', function($q) {
                 $q->whereNotIn('name', ['Engineering Work Completed', 'Project Finished', 'Invoice On Progress', 'Documents Completed', 'Cancelled']);
             })
-            ->with(['statusProject', 'phc'])
+            ->with(['statusProject', 'phc', 'client', 'quotation'])
             ->get()
             ->map(function ($p) {
                 return [
-                    'pn_number'    => $p->pn_number,
-                    'project_name' => $p->project_name,
-                    'target_dates' => $p->phc->target_finish_date,
-                    'status'       => $p->statusProject->name ?? '-',
-                    'pic'          => $p->phc?->picEngineering?->name ?? '-',
+                    'pn_number'     => $p->pn_number,
+                    'project_number' => $p->project_number,
+                    'project_name'  => $p->project_name,
+                    'client_name'   => $p->client->name ?? $p->quotation->client->name ?? '-',
+                    'target_dates'  => $p->phc->target_finish_date,
+                    'status'        => $p->statusProject->name ?? '-',
+                    'pic'           => $p->phc?->picEngineering?->name ?? '-',
                 ];
             });
 
@@ -162,15 +168,17 @@ class ManPowerDashboardApiController extends Controller
             ->whereHas('statusProject', function($q) {
                 $q->whereNotIn('name', ['Engineering Work Completed', 'Project Finished', 'Invoice On Progress', 'Documents Completed', 'Cancelled']);
             })
-            ->with(['statusProject', 'phc'])
+            ->with(['statusProject', 'phc', 'client', 'quotation'])
             ->get()
             ->map(function ($p) {
                 return [
-                    'pn_number'    => $p->pn_number,
-                    'project_name' => $p->project_name,
-                    'target_dates' => $p->phc->target_finish_date,
-                    'status'       => $p->statusProject->name ?? '-',
-                    'pic'          => $p->phc?->picEngineering?->name ?? '-',
+                    'pn_number'     => $p->pn_number,
+                    'project_number' => $p->project_number,
+                    'project_name'  => $p->project_name,
+                    'client_name'   => $p->client->name ?? $p->quotation->client->name ?? '-',
+                    'target_dates'  => $p->phc->target_finish_date,
+                    'status'        => $p->statusProject->name ?? '-',
+                    'pic'           => $p->phc?->picEngineering?->name ?? '-',
                 ];
             });
 
@@ -186,16 +194,20 @@ class ManPowerDashboardApiController extends Controller
             ->with([
                 'statusProject',
                 'phc.picEngineering',
+                'client',
+                'quotation',
             ])
             ->get()
             ->map(function ($p) use ($now) {
                 return [
-                    'pn_number'    => $p->pn_number,
-                    'project_name' => $p->project_name,
-                    'target_dates' => $p->phc->target_finish_date,
-                    'delay_days'   => Carbon::parse($p->phc->target_finish_date)->diffInDays($now),
-                    'status'       => $p->statusProject->name ?? '-',
-                    'pic'          => $p->phc?->picEngineering?->name ?? '-',
+                    'pn_number'     => $p->pn_number,
+                    'project_number' => $p->project_number,
+                    'project_name'  => $p->project_name,
+                    'client_name'   => $p->client->name ?? $p->quotation->client->name ?? '-',
+                    'target_dates'  => $p->phc->target_finish_date,
+                    'delay_days'    => Carbon::parse($p->phc->target_finish_date)->diffInDays($now),
+                    'status'        => $p->statusProject->name ?? '-',
+                    'pic'           => $p->phc?->picEngineering?->name ?? '-',
                 ];
             })
             ->sortByDesc('delay_days')
