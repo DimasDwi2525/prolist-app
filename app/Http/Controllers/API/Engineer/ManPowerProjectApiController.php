@@ -22,6 +22,7 @@ class ManPowerProjectApiController extends Controller
             'drafter',
             'electrician_supervisor',
             'electrician',
+            'site_engineer'
         ];
 
         // Kalau rolenya tidak termasuk, return forbidden
