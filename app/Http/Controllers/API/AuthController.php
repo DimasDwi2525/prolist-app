@@ -44,6 +44,7 @@ class AuthController extends Controller
             
             'engineer_supervisor'  => '/man-power',
             'engineer'             => '/man-power',
+            'site_engineer'             => '/man-power',
             'drafter'              => '/man-power',
             'electrician_supervisor'              => '/man-power',
             'electrician'              => '/man-power',

@@ -35,6 +35,7 @@ class LogApprovalNotification extends Notification implements ShouldQueue
             'log_id' => $this->log->id,
             'project' => $this->log->project->project_number,
             'status' => $this->status,
+            'type' => 'log_update',
         ];
     }
 
@@ -47,6 +48,7 @@ class LogApprovalNotification extends Notification implements ShouldQueue
                 'log_id' => $this->log->id,
                 'project' => $this->log->project->project_number,
                 'status' => $this->status,
+                'type' => 'log_update',
             ],
         ];
     }

@@ -15,7 +15,7 @@ class SendLogApprovalNotification implements ShouldQueue
     {
         $log = $event->log;
 
-        // Kirim notifikasi ke user yang membuat log (users_id)
+        // Kirim notifikasi ke user yang membuat log (users_id) bahwa log telah di approve
         $log->user->notify(new LogApprovalNotification($log, $log->status));
     }
 }

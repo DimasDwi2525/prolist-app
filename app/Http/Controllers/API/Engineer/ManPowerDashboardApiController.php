@@ -54,14 +54,15 @@ class ManPowerDashboardApiController extends Controller
         $dueThisMonth = $this->getProjectsByCriteria($now, $userId, $role, function($q) use ($now) {
             $q->whereNotNull('target_finish_date')
               ->whereMonth('target_finish_date', $now->month)
-              ->whereYear('target_finish_date', $now->year);
+              ->whereYear('target_finish_date', $now->year)
+              ->where('target_finish_date', '>=', $now);
         }, true);
 
         $onTrack = $this->getProjectsByCriteria($now, $userId, $role, function($q) use ($now) {
             $q->whereNotNull('target_finish_date')->where('target_finish_date', '>=', $now);
         }, true);
 
-        $totalActiveProjects = $this->getUserProjectsQuery($userId, $role)->count();
+        $totalActiveProjects = $overdue['count'] + $dueThisMonth['count'] + $onTrack['count'];
 
         $totalWorkOrders = WorkOrder::whereMonth('wo_date', $now->month)
             ->whereYear('wo_date', $now->year)
@@ -118,7 +119,9 @@ class ManPowerDashboardApiController extends Controller
         // Upcoming Projects
         $upcomingProjects = $this->getUserProjectsQuery($userId, $role)
             ->whereHas('phc', function($q) use ($now) {
-                $q->whereBetween('target_finish_date', [$now, $now->copy()->addDays(30)]);
+                $q->whereNotNull('target_finish_date')
+                  ->where('target_finish_date', '>', $now)
+                  ->where('target_finish_date', '<=', $now->copy()->addDays(30));
             })
             ->whereHas('statusProject', function($q) {
                 $q->whereNotIn('name', ['Engineering Work Completed', 'Project Finished', 'Invoice On Progress', 'Documents Completed', 'Cancelled']);
@@ -134,6 +137,7 @@ class ManPowerDashboardApiController extends Controller
                     'client_name'   => $p->client->name ?? $p->quotation->client->name ?? '-',
                     'target_dates'  => $p->phc->target_finish_date,
                     'status'        => $p->statusProject->name ?? '-',
+                    'pic'           => $p->phc?->picEngineering?->name ?? '-',
                 ];
             });
 
@@ -141,7 +145,8 @@ class ManPowerDashboardApiController extends Controller
             ->whereHas('phc', function($q) use ($now) {
                 $q->whereNotNull('target_finish_date')
                     ->whereMonth('target_finish_date', $now->month)
-                    ->whereYear('target_finish_date', $now->year);
+                    ->whereYear('target_finish_date', $now->year)
+                    ->where('target_finish_date', '>=', $now);
             })
             ->whereHas('statusProject', function($q) {
                 $q->whereNotIn('name', ['Engineering Work Completed', 'Project Finished', 'Invoice On Progress', 'Documents Completed', 'Cancelled']);
