@@ -211,12 +211,12 @@ class ManPowerDashboardApiController extends Controller
                     'project_name'  => $p->project_name,
                     'client_name'   => $p->client->name ?? $p->quotation->client->name ?? '-',
                     'target_dates'  => $p->phc->target_finish_date,
-                    'delay_days'    => Carbon::parse($p->phc->target_finish_date)->diffInDays($now),
+                    'logs'          => Carbon::parse($p->phc->target_finish_date)->diffInDays($now),
                     'status'        => $p->statusProject->name ?? '-',
                     'pic'           => $p->phc?->picEngineering?->name ?? '-',
                 ];
             })
-            ->sortByDesc('delay_days')
+            ->sortByDesc('logs')
             ->take(5)
             ->values();
 
@@ -262,18 +262,12 @@ class ManPowerDashboardApiController extends Controller
                     $sub->where('user_id', $userId);
                 })
                 ->orWhereHas('phc', function ($sub) use ($userId, $role) {
-                    if (in_array($role, ['engineer', 'engineer_supervisor'])) {
+                    if (in_array($role, ['engineer', 'engineer_supervisor', 'drafter',
+            'electrician_supervisor',
+            'electrician',
+            'site_engineer'])) {
                         $sub->where('pic_engineering_id', $userId)
                             ->orWhere('ho_engineering_id', $userId);
-                    }
-
-                    if ($role === 'drafter') {
-                        $sub->where('drafter_id', $userId);
-                    }
-
-                    if (in_array($role, ['electrician', 'electrician_supervisor'])) {
-                        $sub->where('pic_electrician_id', $userId)
-                            ->orWhere('ho_electrician_id', $userId);
                     }
                 });
             });
@@ -289,18 +283,12 @@ class ManPowerDashboardApiController extends Controller
         })
         ->orWhere(function ($q) use ($userId, $role) {
             $q->whereHas('phc', function ($sub) use ($userId, $role) {
-                if (in_array($role, ['engineer', 'engineer_supervisor'])) {
+                if (in_array($role, ['engineer', 'engineer_supervisor', 'drafter',
+            'electrician_supervisor',
+            'electrician',
+            'site_engineer'])) {
                     $sub->where('pic_engineering_id', $userId)
                         ->orWhere('ho_engineering_id', $userId);
-                }
-
-                if ($role === 'drafter') {
-                    $sub->where('drafter_id', $userId);
-                }
-
-                if (in_array($role, ['electrician', 'electrician_supervisor'])) {
-                    $sub->where('pic_electrician_id', $userId)
-                        ->orWhere('ho_electrician_id', $userId);
                 }
             });
         });

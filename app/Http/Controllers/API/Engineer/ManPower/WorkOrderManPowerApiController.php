@@ -50,6 +50,7 @@ class WorkOrderManPowerApiController extends Controller
             'drafter',
             'electrician_supervisor',
             'electrician',
+            'site_engineer'
         ];
 
         // Kalau rolenya tidak termasuk, return forbidden
@@ -64,14 +65,11 @@ class WorkOrderManPowerApiController extends Controller
         $project = Project::where('pn_number', $request->project_id)->firstOrFail();
         $hasAccess = $project->manPowerAllocations()->where('user_id', $userId)->exists() ||
                      $project->phc()->where(function ($q) use ($userId, $role) {
-                         if (in_array($role, ['engineer', 'engineer_supervisor'])) {
+                         if (in_array($role, ['engineer', 'engineer_supervisor', 'drafter',
+            'electrician_supervisor',
+            'electrician',
+            'site_engineer'])) {
                              $q->where('pic_engineering_id', $userId)->orWhere('ho_engineering_id', $userId);
-                         }
-                         if ($role === 'drafter') {
-                             $q->where('drafter_id', $userId);
-                         }
-                         if (in_array($role, ['electrician', 'electrician_supervisor'])) {
-                             $q->where('pic_electrician_id', $userId)->orWhere('ho_electrician_id', $userId);
                          }
                      })->exists();
 
@@ -268,6 +266,7 @@ class WorkOrderManPowerApiController extends Controller
             'drafter',
             'electrician_supervisor',
             'electrician',
+            'site_engineer'
         ];
 
         // Kalau rolenya tidak termasuk, return forbidden
@@ -284,14 +283,11 @@ class WorkOrderManPowerApiController extends Controller
         $project = $workOrder->project;
         $hasAccess = $project->manPowerAllocations()->where('user_id', $userId)->exists() ||
                      $project->phc()->where(function ($q) use ($userId, $role) {
-                         if (in_array($role, ['engineer', 'engineer_supervisor'])) {
+                         if (in_array($role, ['engineer', 'engineer_supervisor', 'drafter',
+            'electrician_supervisor',
+            'electrician',
+            'site_engineer'])) {
                              $q->where('pic_engineering_id', $userId)->orWhere('ho_engineering_id', $userId);
-                         }
-                         if ($role === 'drafter') {
-                             $q->where('drafter_id', $userId);
-                         }
-                         if (in_array($role, ['electrician', 'electrician_supervisor'])) {
-                             $q->where('pic_electrician_id', $userId)->orWhere('ho_electrician_id', $userId);
                          }
                      })->exists();
 
@@ -465,6 +461,7 @@ class WorkOrderManPowerApiController extends Controller
             'drafter',
             'electrician_supervisor',
             'electrician',
+            'site_engineer'
         ];
 
         // Kalau rolenya tidak termasuk, return forbidden
@@ -491,12 +488,6 @@ class WorkOrderManPowerApiController extends Controller
                      $project->phc()->where(function ($q) use ($userId, $role) {
                          if (in_array($role, ['engineer', 'engineer_supervisor'])) {
                              $q->where('pic_engineering_id', $userId)->orWhere('ho_engineering_id', $userId);
-                         }
-                         if ($role === 'drafter') {
-                             $q->where('drafter_id', $userId);
-                         }
-                         if (in_array($role, ['electrician', 'electrician_supervisor'])) {
-                             $q->where('pic_electrician_id', $userId)->orWhere('ho_electrician_id', $userId);
                          }
                      })->exists();
 
@@ -525,6 +516,7 @@ class WorkOrderManPowerApiController extends Controller
             'drafter',
             'electrician_supervisor',
             'electrician',
+            'site_engineer'
         ];
 
         // Kalau rolenya tidak termasuk, return forbidden
@@ -550,14 +542,11 @@ class WorkOrderManPowerApiController extends Controller
         $project = $workOrder->project;
         $hasAccess = $project->manPowerAllocations()->where('user_id', $userId)->exists() ||
                      $project->phc()->where(function ($q) use ($userId, $role) {
-                         if (in_array($role, ['engineer', 'engineer_supervisor'])) {
+                         if (in_array($role, ['engineer', 'engineer_supervisor', 'drafter',
+            'electrician_supervisor',
+            'electrician',
+            'site_engineer'])) {
                              $q->where('pic_engineering_id', $userId)->orWhere('ho_engineering_id', $userId);
-                         }
-                         if ($role === 'drafter') {
-                             $q->where('drafter_id', $userId);
-                         }
-                         if (in_array($role, ['electrician', 'electrician_supervisor'])) {
-                             $q->where('pic_electrician_id', $userId)->orWhere('ho_electrician_id', $userId);
                          }
                      })->exists();
 
@@ -607,6 +596,7 @@ class WorkOrderManPowerApiController extends Controller
             'drafter',
             'electrician_supervisor',
             'electrician',
+            'site_engineer'
         ];
 
         // Kalau rolenya tidak termasuk, return forbidden
@@ -627,18 +617,12 @@ class WorkOrderManPowerApiController extends Controller
             ->orWhere(function ($q) use ($userId, $role) {
                 // atau user ini terlibat di PHC sesuai role
                 $q->whereHas('phc', function ($sub) use ($userId, $role) {
-                    if (in_array($role, ['engineer', 'engineer_supervisor'])) {
+                    if (in_array($role, ['engineer', 'engineer_supervisor', 'drafter',
+            'electrician_supervisor',
+            'electrician',
+            'site_engineer'])) {
                         $sub->where('pic_engineering_id', $userId)
                             ->orWhere('ho_engineering_id', $userId);
-                    }
-
-                    if ($role === 'drafter') {
-                        $sub->where('drafter_id', $userId);
-                    }
-
-                    if (in_array($role, ['electrician', 'electrician_supervisor'])) {
-                        $sub->where('pic_electrician_id', $userId)
-                            ->orWhere('ho_electrician_id', $userId);
                     }
                 });
             })

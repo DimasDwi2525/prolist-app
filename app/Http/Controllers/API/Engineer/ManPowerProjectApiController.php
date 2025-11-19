@@ -43,18 +43,12 @@ class ManPowerProjectApiController extends Controller
             ->orWhere(function ($q) use ($userId, $role) {
                 // atau user ini terlibat di PHC sesuai role
                 $q->whereHas('phc', function ($sub) use ($userId, $role) {
-                    if (in_array($role, ['engineer', 'engineer_supervisor'])) {
+                    if (in_array($role, ['engineer', 'engineer_supervisor', 'drafter',
+            'electrician_supervisor',
+            'electrician',
+            'site_engineer'])) {
                         $sub->where('pic_engineering_id', $userId)
                             ->orWhere('ho_engineering_id', $userId);
-                    }
-
-                    if ($role === 'drafter') {
-                        $sub->where('drafter_id', $userId);
-                    }
-
-                    if (in_array($role, ['electrician', 'electrician_supervisor'])) {
-                        $sub->where('pic_electrician_id', $userId)
-                            ->orWhere('ho_electrician_id', $userId);
                     }
                 });
             })
