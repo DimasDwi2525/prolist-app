@@ -28,6 +28,7 @@ class WorkOrderApiController extends Controller
 
         $workOrders = WorkOrder::with(['pics.user', 'pics.role', 'descriptions', 'purpose'])
             ->where('project_id', $project->pn_number)
+            ->orderBy('created_at', 'desc')
             ->get();
 
         return response()->json([
