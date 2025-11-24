@@ -140,6 +140,14 @@ class WorkOrder extends Model
     }
 
     /**
+     * Relasi ke Approvals (morphMany)
+     */
+    public function approvals()
+    {
+        return $this->morphMany(Approval::class, 'approvable');
+    }
+
+    /**
      * Accessor: gabungkan kode & nomor untuk display WO
      */
     public function getDisplayCodeAttribute(): string

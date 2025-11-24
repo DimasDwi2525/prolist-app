@@ -25,6 +25,12 @@ class EventServiceProvider extends ServiceProvider
         \App\Events\LogApprovalUpdated::class => [
             \App\Listeners\SendLogApprovalNotification::class,
         ],
+        \App\Events\PhcApprovalUpdated::class => [
+            \App\Listeners\SendPhcApprovalNotification::class,
+        ],
+        \App\Events\WorkOrderApprovalUpdated::class => [
+            \App\Listeners\SendWorkOrderApprovalNotification::class,
+        ],
         \App\Events\LogCreatedEvent::class => [
             \App\Listeners\SendLogCreatedNotification::class,
         ],

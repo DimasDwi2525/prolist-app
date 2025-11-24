@@ -14,12 +14,15 @@ class WorkOrderPdf extends FPDF
 
     protected $pics;
 
+    protected $isTableContinuation = false;
+
     public function __construct($workOrder, $data, $pics)
     {
         parent::__construct();
         $this->workOrder = $workOrder;
         $this->data = $data;
         $this->pics = $pics;
+        $this->SetAutoPageBreak(true, 10); // Enable automatic page breaks with 10mm margin
     }
 
     // Header
@@ -102,13 +105,14 @@ class WorkOrderPdf extends FPDF
 
 
         // Isi max 5 baris (10 PIC slot)
-        $maxRows = 5; 
+        $maxRows = 5;
         for ($i = 0; $i < $maxRows; $i++) {
             // PIC kiri
-            $leftIndex = $i * 2;
+            $leftIndex = $i;
+            $leftNo = $i + 1;
             if (isset($this->pics[$leftIndex])) {
                 $pic = $this->pics[$leftIndex];
-                $this->Cell(10,6,$pic['no'],1,0,'C');
+                $this->Cell(10,6,$leftNo,1,0,'C');
                 $this->Cell(43,6,$pic['name'],1,0,'L');
                 $this->Cell(42,6,$pic['role'],1,0,'L');
             } else {
@@ -118,10 +122,11 @@ class WorkOrderPdf extends FPDF
             }
 
             // PIC kanan
-            $rightIndex = $i * 2 + 1;
+            $rightIndex = $i + 5;
+            $rightNo = $i + 6;
             if (isset($this->pics[$rightIndex])) {
                 $pic = $this->pics[$rightIndex];
-                $this->Cell(10,6,$pic['no'],1,0,'C');
+                $this->Cell(10,6,$rightNo,1,0,'C');
                 $this->Cell(43,6,$pic['name'],1,0,'L');
                 $this->Cell(42,6,$pic['role'],1,1,'L');
             } else {
@@ -167,9 +172,27 @@ foreach ($this->data as $row) {
     // Tinggi maksimal baris
     $lineHeight = max($descHeight, $resultHeight, $rowHeight);
 
+    // Check if adding this row would exceed the page height
+    if ($y + $lineHeight > $this->PageBreakTrigger) {
+        // Add new page and reprint headers
+        $this->AddPage();
+        $this->SetFont('Arial','B',10);
+        $this->Cell(80,8,'Work Description',1,0,'C');
+        $this->Cell(110,8,'Result',1,1,'C');
+        $this->SetFont('Arial','',10);
+        // Reset y to after header
+        $y = $this->GetY();
+    }
+
     // Gambar border luar saja (tanpa garis internal MultiCell)
     $this->Rect($x, $y, $colDesc, $lineHeight);
     $this->Rect($x + $colDesc, $y, $colResult, $lineHeight);
+
+    // Isi teks di dalam border
+    $this->SetXY($x, $y);
+    $this->MultiCell($colDesc, 6, utf8_decode($row['desc']), 0, 'L');
+    $this->SetXY($x + $colDesc, $y);
+    $this->MultiCell($colResult, 6, utf8_decode($row['result']), 0, 'L');
 
     // Pindah ke bawah
     $this->SetXY($x, $y + $lineHeight);
@@ -191,9 +214,9 @@ foreach ($this->data as $row) {
 
 
         // Signature
-        $this->Cell(49,5,'Requested by',1,0,'C');
-        $this->Cell(47,5,'Approved by',1,0,'C');
-        $this->Cell(47,5,'Accepted by',1,0,'C');
+        $this->Cell(49,5,'Requested Digital by',1,0,'C');
+        $this->Cell(47,5,'Approved Digital by',1,0,'C');
+        $this->Cell(47,5,'Accepted Digital by',1,0,'C');
         $this->Cell(47,5,'Client',1,1,'C');
 
         // Buat kotak kosong tanda tangan
@@ -228,7 +251,7 @@ foreach ($this->data as $row) {
         $this->Cell(47,5,'',1,0,'C');
         $this->Cell(47,5,'',1,1,'C');
 
-        $this->SetFont('Arial','B',12);
+        $this->SetFont('Arial','',12);
         $this->Cell(55,5,'OVERNIGHT WORK / JOB',1,0,'L');
         $this->Cell(135,5,'[ ] Yes   [ ] No',1,1,'L');
 

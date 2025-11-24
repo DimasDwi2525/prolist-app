@@ -24,7 +24,7 @@ class AuthController extends Controller
 
         $roleRedirects = [
             'super_admin'          => '/admin',
-            'marketing_director'   => '/marketing-director',
+            'marketing_director'   => '/marketing',
             'supervisor marketing' => '/marketing',
             'manager_marketing'    => '/marketing',
             'sales_supervisor'     => '/marketing',

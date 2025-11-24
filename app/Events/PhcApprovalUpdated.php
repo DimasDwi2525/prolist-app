@@ -2,31 +2,45 @@
 
 namespace App\Events;
 
-use App\Models\PhcApproval;
+use App\Models\PHC;
 use Illuminate\Broadcasting\Channel;
-use Illuminate\Queue\SerializesModels;
 use Illuminate\Broadcasting\InteractsWithSockets;
+use Illuminate\Broadcasting\PrivateChannel;
+use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
-use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
+use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Log as LogFacade;
 
-class PhcApprovalUpdated implements ShouldBroadcast
+class PhcApprovalUpdated implements ShouldBroadcastNow
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
-    public $approval;
+    public $phc;
 
-    public function __construct(PhcApproval $approval)
+    public function __construct(PHC $phc)
     {
-        $this->approval = $approval->load('phc.project');
+        $this->phc = $phc;
     }
 
     public function broadcastOn()
     {
-        return new Channel('phc-approval');
+        return new Channel('phc.approval.updated'); // public channel
     }
 
-    public function broadcastAs()
+    public function broadcastAs(): string
     {
-        return 'PhcApprovalUpdated';
+        return 'phc.approval.updated';
+    }
+
+    public function broadcastWith(): array
+    {
+        $projectNumber = $this->phc->project ? $this->phc->project->project_number : 'Unknown';
+        return [
+            'phc_id' => $this->phc->id,
+            'status' => $this->phc->status,
+            'message' => "PHC approval for project {$projectNumber} has been updated.",
+            'created_at' => now()->toISOString(),
+            'title' => 'PHC Approval Updated',
+        ];
     }
 }

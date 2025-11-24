@@ -95,6 +95,9 @@ class ApprovallController extends Controller
             $phc->update(['status' => 'ready']);
         }
 
+        // Fire event for notification
+        event(new \App\Events\PhcApprovalUpdated($phc));
+
         return response()->json([
             'message' => "Approval berhasil {$request->status}",
             'approval' => $approval,
@@ -234,6 +237,9 @@ class ApprovallController extends Controller
                 'status' => 'rejected',
             ]);
         }
+
+        // Fire event for notification
+        event(new \App\Events\LogApprovalUpdated($log));
 
         return response()->json([
             'message' => "Approval berhasil {$request->status}",
