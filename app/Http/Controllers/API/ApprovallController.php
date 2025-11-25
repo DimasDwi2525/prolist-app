@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\API;
 
+use App\Events\ApprovalPageUpdatedEvent;
 use App\Http\Controllers\Controller;
 use App\Models\Approval;
 use App\Models\Log;
@@ -98,6 +99,15 @@ class ApprovallController extends Controller
         // Fire event for notification
         event(new \App\Events\PhcApprovalUpdated($phc));
 
+        // Fire event to update approval page
+        event(new ApprovalPageUpdatedEvent(
+            'PHC',
+            $approval->id,
+            $request->status,
+            PHC::class,
+            $phc->id
+        ));
+
         return response()->json([
             'message' => "Approval berhasil {$request->status}",
             'approval' => $approval,
@@ -172,6 +182,25 @@ class ApprovallController extends Controller
             $wo->update(['status' => WorkOrder::STATUS_WAITING_APPROVAL]);
         }
 
+        // Fire event for notification
+        // Fire event for notification only if the user who approved is different from the creator
+        // As per PHC creation event logic:
+        // Do not notify the user who created the work order
+        // So exclude creator from notifications and events even if they are the approver
+
+        if ($wo->creator && $wo->creator->id !== $user->id) {
+            event(new \App\Events\WorkOrderApprovalUpdated($wo));
+        }
+
+        // Fire event to update approval page
+        event(new ApprovalPageUpdatedEvent(
+            'WorkOrder',
+            $approval->id,
+            $request->status,
+            WorkOrder::class,
+            $wo->id
+        ));
+
         return response()->json([
             'message' => "Approval berhasil {$request->status}",
             'approval' => $approval,
@@ -238,8 +267,18 @@ class ApprovallController extends Controller
             ]);
         }
 
-        // Fire event for notification
-        event(new \App\Events\LogApprovalUpdated($log));
+        // Event LogApprovalUpdated akan di-trigger otomatis oleh LogObserver
+        // ketika status log berubah (approved/rejected)
+        // Tidak perlu manual fire event di sini untuk menghindari duplicate
+
+        // Fire event to update approval page
+        event(new ApprovalPageUpdatedEvent(
+            'Log',
+            $approval->id,
+            $request->status,
+            Log::class,
+            $log->id
+        ));
 
         return response()->json([
             'message' => "Approval berhasil {$request->status}",

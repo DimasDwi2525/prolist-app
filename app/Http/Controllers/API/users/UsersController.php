@@ -82,6 +82,7 @@ class UsersController extends Controller
                     'engineering_admin',
                     'electrician_supervisor',
                     'site_engineer',
+                    'electrician',
                     'drafter']);
         })
         ->with(['role' => function ($q) {

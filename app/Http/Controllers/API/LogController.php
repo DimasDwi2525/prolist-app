@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\API;
 
+use App\Events\ApprovalPageUpdatedEvent;
 use App\Http\Controllers\Controller;
 use App\Models\Log;
 use App\Models\Approval;
@@ -136,11 +137,20 @@ class LogController extends Controller
 
             // Buat approval jika belum ada
             if ($log->approvals()->where('user_id', $validated['response_by'])->doesntExist()) {
-                $log->approvals()->create([
+                $approval = $log->approvals()->create([
                     'user_id' => $validated['response_by'],
                     'type' => 'log',
                     'status' => 'pending',
                 ]);
+
+                // Fire event to update approval page
+                event(new ApprovalPageUpdatedEvent(
+                    'Log',
+                    $approval->id,
+                    'pending',
+                    Log::class,
+                    $log->id
+                ));
             }
         }
 

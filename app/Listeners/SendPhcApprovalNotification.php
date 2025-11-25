@@ -14,8 +14,12 @@ class SendPhcApprovalNotification implements ShouldQueue
     public function handle(PhcApprovalUpdated $event)
     {
         $phc = $event->phc;
+        $approverId = $phc->ho_engineering_id;
 
-        // Kirim notifikasi ke user yang membuat PHC (created_by) bahwa PHC telah di approve
-        $phc->createdBy->notify(new PhcApprovalNotification($phc, $phc->status));
+        // Kirim notifikasi ke user yang membuat PHC (created_by),
+        // kecuali jika user tersebut adalah pembuat PHC sendiri
+        if ($phc->createdBy && $phc->createdBy->id !== $approverId && $phc->createdBy->id !== $phc->created_by) {
+            $phc->createdBy->notify(new PhcApprovalNotification($phc, $phc->status));
+        }
     }
 }

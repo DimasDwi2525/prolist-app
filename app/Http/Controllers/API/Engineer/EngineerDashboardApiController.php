@@ -67,9 +67,12 @@ class EngineerDashboardApiController extends Controller
         $count = $query->count();
 
         $listQuery = clone $query;
-        $list = $listQuery->with(['statusProject', 'phc', 'client', 'quotation'])
+        $list = $listQuery->with(['statusProject', 'phc', 'client', 'quotation', 'logs' => function($q) {
+                $q->orderBy('created_at', 'desc');
+            }])
             ->get()
             ->map(function ($p) {
+                $latestLog = $p->logs->first();
                 return [
                     'pn_number'     => $p->pn_number,
                     'project_number' => $p->project_number,
@@ -78,6 +81,7 @@ class EngineerDashboardApiController extends Controller
                     'target_dates'  => $p->phc->target_finish_date,
                     'status'        => $p->statusProject->name ?? '-',
                     'pic'           => $p->phc?->picEngineering?->name ?? '-',
+                    'latest_log'    => $latestLog ? $latestLog->logs : null,
                 ];
             });
 
@@ -208,6 +212,7 @@ class EngineerDashboardApiController extends Controller
                 'delay_days'    => Carbon::parse($p['target_dates'])->diffInDays($now),
                 'status'        => $p['status'],
                 'pic'           => $p['pic'],
+                'latest_log'    => $p['latest_log'],
             ];
         })->sortByDesc('delay_days')
         // ->take(5)

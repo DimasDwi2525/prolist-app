@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\API\Marketing;
 
+use App\Events\ApprovalPageUpdatedEvent;
 use App\Events\PhcCreatedEvent;
 use App\Http\Controllers\Controller;
 use App\Models\Approval;
@@ -128,13 +129,22 @@ class MarketingPhcApiController extends Controller
         // 5. SIMPAN APPROVALS
         // ================================
         foreach ($approverIds as $uid) {
-            Approval::create([
+            $approval = Approval::create([
                 'approvable_type' => PHC::class,
                 'type'            => 'PHC',
                 'approvable_id'   => $phc->id,
                 'user_id'         => $uid,
                 'status'          => 'pending',
             ]);
+
+            // Fire event to update approval page
+            event(new ApprovalPageUpdatedEvent(
+                'PHC',
+                $approval->id,
+                'pending',
+                PHC::class,
+                $phc->id
+            ));
         }
 
 

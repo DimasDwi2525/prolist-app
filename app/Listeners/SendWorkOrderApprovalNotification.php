@@ -14,8 +14,12 @@ class SendWorkOrderApprovalNotification implements ShouldQueue
     public function handle(WorkOrderApprovalUpdated $event)
     {
         $workOrder = $event->workOrder;
+        $approverId = $workOrder->approved_by;
 
-        // Kirim notifikasi ke user yang membuat Work Order (created_by) bahwa Work Order telah di approve
-        $workOrder->creator->notify(new WorkOrderApprovalNotification($workOrder, $workOrder->status));
+        // Kirim notifikasi ke user yang membuat Work Order (created_by),
+        // kecuali jika user tersebut adalah pembuat Work Order
+        if ($workOrder->creator && $workOrder->creator->id !== $approverId && $workOrder->creator->id !== $workOrder->created_by) {
+            $workOrder->creator->notify(new WorkOrderApprovalNotification($workOrder, $workOrder->status));
+        }
     }
 }

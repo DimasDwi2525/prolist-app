@@ -95,9 +95,12 @@ class ManPowerDashboardApiController extends Controller
         $count = $query->count();
 
         $listQuery = clone $query;
-        $list = $listQuery->with(['statusProject', 'phc', 'client', 'quotation'])
+        $list = $listQuery->with(['statusProject', 'phc', 'client', 'quotation', 'logs' => function($q) {
+                $q->orderBy('created_at', 'desc');
+            }])
             ->get()
             ->map(function ($p) {
+                $latestLog = $p->logs->first();
                 return [
                     'pn_number'     => $p->pn_number,
                     'project_number' => $p->project_number,
@@ -106,6 +109,7 @@ class ManPowerDashboardApiController extends Controller
                     'target_dates'  => $p->phc->target_finish_date,
                     'status'        => $p->statusProject->name ?? '-',
                     'pic'           => $p->phc?->picEngineering?->name ?? '-',
+                    'latest_log'    => $latestLog ? $latestLog->logs : null,
                 ];
             });
 
@@ -127,10 +131,13 @@ class ManPowerDashboardApiController extends Controller
             ->whereHas('statusProject', function($q) {
                 $q->whereNotIn('name', ['Engineering Work Completed', 'Project Finished', 'Invoice On Progress', 'Documents Completed', 'Cancelled']);
             })
-            ->with(['statusProject', 'phc', 'client', 'quotation'])
+            ->with(['statusProject', 'phc', 'client', 'quotation', 'logs' => function($q) {
+                $q->orderBy('created_at', 'desc');
+            }])
             ->get()
             ->sortBy('phc.target_finish_date')
             ->map(function ($p) {
+                $latestLog = $p->logs->first();
                 return [
                     'pn_number'     => $p->pn_number,
                     'project_number' => $p->project_number,
@@ -139,6 +146,7 @@ class ManPowerDashboardApiController extends Controller
                     'target_dates'  => $p->phc->target_finish_date,
                     'status'        => $p->statusProject->name ?? '-',
                     'pic'           => $p->phc?->picEngineering?->name ?? '-',
+                    'latest_log'    => $latestLog ? $latestLog->logs : null,
                 ];
             });
 
@@ -152,9 +160,12 @@ class ManPowerDashboardApiController extends Controller
             ->whereHas('statusProject', function($q) {
                 $q->whereNotIn('name', ['Engineering Work Completed', 'Project Finished', 'Invoice On Progress', 'Documents Completed', 'Cancelled']);
             })
-            ->with(['statusProject', 'phc', 'client', 'quotation'])
+            ->with(['statusProject', 'phc', 'client', 'quotation', 'logs' => function($q) {
+                $q->orderBy('created_at', 'desc');
+            }])
             ->get()
             ->map(function ($p) {
+                $latestLog = $p->logs->first();
                 return [
                     'pn_number'     => $p->pn_number,
                     'project_number' => $p->project_number,
@@ -163,6 +174,7 @@ class ManPowerDashboardApiController extends Controller
                     'target_dates'  => $p->phc->target_finish_date,
                     'status'        => $p->statusProject->name ?? '-',
                     'pic'           => $p->phc?->picEngineering?->name ?? '-',
+                    'latest_log'    => $latestLog ? $latestLog->logs : null,
                 ];
             });
 
@@ -174,9 +186,12 @@ class ManPowerDashboardApiController extends Controller
             ->whereHas('statusProject', function($q) {
                 $q->whereNotIn('name', ['Engineering Work Completed', 'Project Finished', 'Invoice On Progress', 'Documents Completed', 'Cancelled']);
             })
-            ->with(['statusProject', 'phc', 'client', 'quotation'])
+            ->with(['statusProject', 'phc', 'client', 'quotation', 'logs' => function($q) {
+                $q->orderBy('created_at', 'desc');
+            }])
             ->get()
             ->map(function ($p) {
+                $latestLog = $p->logs->first();
                 return [
                     'pn_number'     => $p->pn_number,
                     'project_number' => $p->project_number,
@@ -185,6 +200,7 @@ class ManPowerDashboardApiController extends Controller
                     'target_dates'  => $p->phc->target_finish_date,
                     'status'        => $p->statusProject->name ?? '-',
                     'pic'           => $p->phc?->picEngineering?->name ?? '-',
+                    'latest_log'    => $latestLog ? $latestLog->logs : null,
                 ];
             });
 
@@ -202,21 +218,26 @@ class ManPowerDashboardApiController extends Controller
                 'phc.picEngineering',
                 'client',
                 'quotation',
+                'logs' => function($q) {
+                    $q->orderBy('created_at', 'desc');
+                }
             ])
             ->get()
             ->map(function ($p) use ($now) {
+                $latestLog = $p->logs->first();
                 return [
                     'pn_number'     => $p->pn_number,
                     'project_number' => $p->project_number,
                     'project_name'  => $p->project_name,
                     'client_name'   => $p->client->name ?? $p->quotation->client->name ?? '-',
                     'target_dates'  => $p->phc->target_finish_date,
-                    'logs'          => Carbon::parse($p->phc->target_finish_date)->diffInDays($now),
+                    'delay_days'    => Carbon::parse($p->phc->target_finish_date)->diffInDays($now),
                     'status'        => $p->statusProject->name ?? '-',
                     'pic'           => $p->phc?->picEngineering?->name ?? '-',
+                    'latest_log'    => $latestLog ? $latestLog->logs : null,
                 ];
             })
-            ->sortByDesc('logs')
+            ->sortByDesc('delay_days')
             ->take(5)
             ->values();
 
