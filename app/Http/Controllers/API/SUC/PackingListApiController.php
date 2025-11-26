@@ -13,7 +13,17 @@ class PackingListApiController extends Controller
 
     public function index()
     {
-        $lists = PackingList::with(['project', 'expedition', 'plType', 'intPic', 'creator', 'destination'])->get();
+        // Sorting by numeric part of pl_number (format: PL/XXX/YYYY)
+        $lists = PackingList::with(['project', 'expedition', 'plType', 'intPic', 'creator', 'destination'])
+            ->get()
+            ->sortByDesc(function ($item) {
+                if (preg_match('/^PL\/(\d{3})\/(\d{4})$/', $item->pl_number, $matches)) {
+                    // parse the numeric part as integer for sorting by largest number
+                    return (int) $matches[1];
+                }
+                return 0;
+            })->values(); // reindex collection after sorting
+
         return response()->json($lists);
     }
 
@@ -40,29 +50,52 @@ class PackingListApiController extends Controller
             'receive_date' => 'nullable|date',
             'pl_return_date' => 'nullable|date',
             'remark' => 'nullable|string',
+            'pl_number' => 'nullable|string', // allow pl_number to be optionally provided
         ]);
 
-        // ambil tahun sekarang
-        $year = now()->format('Y');
+        // If pl_number is provided in request, use that; otherwise generate
+        if (!empty($validated['pl_number'])) {
+            $pl_number = $validated['pl_number'];
 
-        // cek nomor terakhir untuk tahun ini
-        $last = PackingList::whereYear('created_at', $year)
-            ->orderByDesc('created_at')
-            ->first();
+            // Attempt to parse number part and year from given pl_number
+            if (preg_match('/^PL\/(\d{3})\/(\d{4})$/', $pl_number, $matches)) {
+                $numberFormatted = $matches[1];
+                $year = $matches[2];
+            } else {
+                // If format incorrect, fall back to generate new number for current year
+                $year = now()->format('Y');
+                $last = PackingList::whereYear('created_at', $year)
+                    ->orderByDesc('created_at')
+                    ->first();
 
-        $nextNumber = 1;
+                $nextNumber = 1;
+                if ($last) {
+                    $lastNumber = (int) substr($last->pl_number, 3, 3);
+                    $nextNumber = $lastNumber + 1;
+                }
+                $numberFormatted = str_pad($nextNumber, 3, '0', STR_PAD_LEFT);
+                $pl_number = "PL/{$numberFormatted}/{$year}";
+            }
+        } else {
+            // auto-generate pl_number and year
+            $year = now()->format('Y');
+            $last = PackingList::whereYear('created_at', $year)
+                ->orderByDesc('created_at')
+                ->first();
 
-        if ($last) {
-            // ambil nomor urut dari pl_number (contoh: PL/005/2025 → 005)
-            $lastNumber = (int) substr($last->pl_number, 3, 3);
-            $nextNumber = $lastNumber + 1;
+            $nextNumber = 1;
+
+            if ($last) {
+                $lastNumber = (int) substr($last->pl_number, 3, 3);
+                $nextNumber = $lastNumber + 1;
+            }
+
+            $numberFormatted = str_pad($nextNumber, 3, '0', STR_PAD_LEFT);
+
+            $pl_number = "PL/{$numberFormatted}/{$year}";
         }
 
-        // format nomor urut jadi 3 digit
-        $numberFormatted = str_pad($nextNumber, 3, '0', STR_PAD_LEFT);
-
-        // generate pl_number & pl_id
-        $validated['pl_number'] = "PL/{$numberFormatted}/{$year}";
+        $validated['pl_number'] = $pl_number;
         $validated['pl_id'] = $numberFormatted . $year;
         $validated['created_by'] = auth()->id();
 
@@ -97,6 +130,7 @@ class PackingListApiController extends Controller
             'receive_date' => 'nullable|date',
             'pl_return_date' => 'nullable|date',
             'remark' => 'nullable|string',
+            'pl_number' => 'nullable|string', // allow updating pl_number
         ]);
 
         // Cast foreign key fields to integers to prevent SQL Server conversion errors
@@ -105,6 +139,20 @@ class PackingListApiController extends Controller
         $validated['expedition_id'] = isset($validated['expedition_id']) ? (int) $validated['expedition_id'] : null;
         $validated['pl_type_id'] = isset($validated['pl_type_id']) ? (int) $validated['pl_type_id'] : null;
         $validated['int_pic'] = isset($validated['int_pic']) ? (int) $validated['int_pic'] : null;
+
+        // If pl_number is given, parse it to generate corresponding pl_id
+        if (!empty($validated['pl_number'])) {
+            $pl_number = $validated['pl_number'];
+
+            if (preg_match('/^PL\/(\d{3})\/(\d{4})$/', $pl_number, $matches)) {
+                $numberFormatted = $matches[1];
+                $year = $matches[2];
+                $validated['pl_id'] = $numberFormatted . $year;
+            } else {
+                // Invalid format, remove pl_number to avoid saving bad data
+                unset($validated['pl_number']);
+            }
+        }
 
         $packingList->update($validated);
 

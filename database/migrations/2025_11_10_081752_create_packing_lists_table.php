@@ -27,7 +27,7 @@ return new class extends Migration
             $table->string('client_pic')->nullable();
             $table->dateTime('receive_date')->nullable();
             $table->dateTime('pl_return_date')->nullable();
-            $table->text('remark');
+            $table->text('remark')->nullable();
             $table->foreignId('created_by')->nullable()->constrained('users', 'id');
             $table->timestamps();
         });
