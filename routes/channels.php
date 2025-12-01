@@ -35,5 +35,15 @@ Broadcast::channel('approval.page.updated', function ($user) {
     return true;
 });
 
+Broadcast::channel('online-users', function ($user) {
+    $user->load('role');
+    return [
+        'id' => $user->id,
+        'name' => $user->name,
+        'role' => $user->role?->name,
+    ];
+});
+
+
 
 

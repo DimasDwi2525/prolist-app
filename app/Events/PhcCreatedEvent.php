@@ -26,12 +26,13 @@ class PhcCreatedEvent implements ShouldBroadcastNow
 
     public function broadcastOn()
     {
-        return new Channel('phc.created'); // ✅ public channel
+        Log::info('PhcCreatedEvent broadcastWith called', ['phc_id' => $this->phc->id, 'user_ids' => $this->userIds]);
+        return new Channel('phc_created'); // ✅ public channel
     }
 
     public function broadcastAs(): string
     {
-        return 'phc.created';
+        return 'phc_created';
     }
 
     public function broadcastWith(): array

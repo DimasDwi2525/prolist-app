@@ -38,5 +38,8 @@ class AppServiceProvider extends ServiceProvider
 
         // Register ApprovalObserver
         \App\Models\Approval::observe(\App\Observers\ApprovalObserver::class);
+
+        // Register RequestInvoiceObserver
+        \App\Models\RequestInvoice::observe(\App\Observers\RequestInvoiceObserver::class);
     }
 }

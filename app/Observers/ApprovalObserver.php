@@ -3,35 +3,25 @@
 namespace App\Observers;
 
 use App\Models\Approval;
-use App\Events\ApprovalPageUpdatedEvent;
+use App\Events\SidebarCounterUpdate;
 
 class ApprovalObserver
 {
-    /**
-     * Handle the Approval "created" event.
-     */
-    public function created(Approval $approval): void
+    public function created(Approval $approval)
     {
-        event(new ApprovalPageUpdatedEvent(
-            $approval->type,
-            $approval->id,
-            $approval->status,
-            $approval->approvable_type,
-            $approval->approvable_id
-        ));
+        // Trigger sidebar counter update for the user who needs to approve
+        event(new SidebarCounterUpdate($approval->user_id));
     }
 
-    /**
-     * Handle the Approval "updated" event.
-     */
-    public function updated(Approval $approval): void
+    public function updated(Approval $approval)
     {
-        event(new ApprovalPageUpdatedEvent(
-            $approval->type,
-            $approval->id,
-            $approval->status,
-            $approval->approvable_type,
-            $approval->approvable_id
-        ));
+        // Trigger sidebar counter update for the user who needs to approve
+        event(new SidebarCounterUpdate($approval->user_id));
+    }
+
+    public function deleted(Approval $approval)
+    {
+        // Trigger sidebar counter update for the user who needs to approve
+        event(new SidebarCounterUpdate($approval->user_id));
     }
 }
