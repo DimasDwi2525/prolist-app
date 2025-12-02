@@ -52,7 +52,7 @@ class WorkOrderCreatedNotification extends Notification implements ShouldQueue
     {
         return [
             'title' => 'New Work Order Created',
-            'message' => 'Work Order ' . $this->workOrder->wo_kode_no . ' has been created for project ' . $this->workOrder->project->project_name,
+            'message' => 'Work Order ' . $this->workOrder->wo_kode_no . ' has been created for project ' . $this->workOrder->project->project_number,
             'work_order_id' => $this->workOrder->id,
             'project_id' => $this->workOrder->project_id,
             'type' => 'work_order_created',

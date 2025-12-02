@@ -17,9 +17,12 @@ class LogApprovalUpdated implements ShouldBroadcastNow
 
     public $log;
 
-    public function __construct(Log $log)
+    public $userIds;
+
+    public function __construct(Log $log, array $userIds)
     {
         $this->log = $log;
+        $this->userIds = $userIds;
     }
 
     public function broadcastOn()

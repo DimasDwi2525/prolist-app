@@ -16,10 +16,12 @@ class PhcApprovalUpdated implements ShouldBroadcastNow
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
     public $phc;
+    public $userIds;
 
-    public function __construct(PHC $phc)
+    public function __construct(PHC $phc, array $userIds)
     {
         $this->phc = $phc;
+        $this->userIds = $userIds;
     }
 
     public function broadcastOn()

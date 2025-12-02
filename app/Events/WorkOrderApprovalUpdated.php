@@ -17,9 +17,12 @@ class WorkOrderApprovalUpdated implements ShouldBroadcastNow
 
     public $workOrder;
 
-    public function __construct(WorkOrder $workOrder)
+    public $userIds;
+
+    public function __construct(WorkOrder $workOrder, array $userIds)
     {
         $this->workOrder = $workOrder;
+        $this->userIds = $userIds;
     }
 
     public function broadcastOn()

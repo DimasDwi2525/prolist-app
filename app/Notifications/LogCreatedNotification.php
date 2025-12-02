@@ -29,7 +29,7 @@ class LogCreatedNotification extends Notification implements ShouldQueue
     {
         return [
             'title' => 'Log Created',
-            'message' => "A new log has been created for Project {$this->log->project->project_name}",
+            'message' => "A new log has been created for Project {$this->log->project->project_number} - {$this->log->project->project_name}",
             'log_id'  => $this->log->id,
             'project' => $this->log->project->project_number,
             'type' => 'log_created',
@@ -41,7 +41,7 @@ class LogCreatedNotification extends Notification implements ShouldQueue
         return [
             'data' => [
                 'title' => 'Log Created',
-                'message' => "A new log has been created for Project {$this->log->project->project_name}",
+                'message' => "A new log has been created for Project {$this->log->project->project_number} - {$this->log->project->project_name}",
                 'log_id'  => $this->log->id,
                 'project' => $this->log->project->project_number,
                 'type' => 'log_created',

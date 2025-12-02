@@ -31,7 +31,7 @@ class PhcApprovalNotification extends Notification implements ShouldQueue
     {
         return [
             'title' => 'PHC Approval Updated',
-            'message' => "Your PHC approval for Project {$this->phc->project->project_name} has been {$this->status}",
+            'message' => "Your PHC approval for Project {$this->phc->project->project_number} - {$this->phc->project->project_name} has been {$this->status}",
             'phc_id' => $this->phc->id,
             'project' => $this->phc->project->project_number,
             'status' => $this->status,
@@ -44,7 +44,7 @@ class PhcApprovalNotification extends Notification implements ShouldQueue
         return [
             'data' => [
                 'title' => 'PHC Approval Updated',
-                'message' => "Your PHC approval for Project {$this->phc->project->project_name} has been {$this->status}",
+                'message' => "Your PHC approval for Project {$this->phc->project->project_number} - {$this->phc->project->project_name} has been {$this->status}",
                 'phc_id' => $this->phc->id,
                 'project' => $this->phc->project->project_number,
                 'status' => $this->status,

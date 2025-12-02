@@ -31,7 +31,7 @@ class WorkOrderApprovalNotification extends Notification implements ShouldQueue
     {
         return [
             'title' => 'Work Order Approval Updated',
-            'message' => "Your Work Order approval for Project {$this->workOrder->project->project_name} has been {$this->status}",
+            'message' => "Your Work Order approval for Project {$this->workOrder->project->project_number} - {$this->workOrder->project->project_name} has been {$this->status}",
             'work_order_id' => $this->workOrder->id,
             'project' => $this->workOrder->project->project_number,
             'status' => $this->status,

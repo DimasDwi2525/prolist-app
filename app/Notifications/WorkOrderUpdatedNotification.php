@@ -52,7 +52,7 @@ class WorkOrderUpdatedNotification extends Notification implements ShouldQueue
     {
         return [
             'title' => 'Work Order Updated',
-            'message' => 'Work Order ' . $this->workOrder->wo_kode_no . ' has been updated for project ' . $this->workOrder->project->project_name,
+            'message' => 'Work Order ' . $this->workOrder->wo_kode_no . ' has been updated for project ' . $this->workOrder->project->project_number,
             'work_order_id' => $this->workOrder->id,
             'project_id' => $this->workOrder->project_id,
             'type' => 'work_order_updated',

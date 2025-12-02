@@ -153,50 +153,53 @@ class WorkOrderPdf extends FPDF
         $this->SetFont('Arial','',10);
 
         $rowHeight  = 22;      // tinggi minimal baris
-$colDesc = 80;         // lebar kolom Work Description
-$colResult = 110;      // lebar kolom Result
+        $colDesc = 80;         // lebar kolom Work Description
+        $colResult = 110;      // lebar kolom Result
 
-foreach ($this->data as $row) {
-    $x = $this->GetX();
-    $y = $this->GetY();
+        $maxRows = max(count($this->data), 4);
+        for ($i = 0; $i < $maxRows; $i++) {
+            $row = isset($this->data[$i]) ? $this->data[$i] : ['desc' => '', 'result' => ''];
 
-    // Tentukan tinggi isi pakai multicell (tanpa border)
-    $this->SetXY($x, $y);
-    $this->MultiCell($colDesc, 6, utf8_decode($row['desc']), 0, 'L');
-    $descHeight = $this->GetY() - $y;
+            $x = $this->GetX();
+            $y = $this->GetY();
 
-    $this->SetXY($x + $colDesc, $y);
-    $this->MultiCell($colResult, 6, utf8_decode($row['result']), 0, 'L');
-    $resultHeight = $this->GetY() - $y;
+            // Tentukan tinggi isi pakai multicell (tanpa border)
+            $this->SetXY($x, $y);
+            $this->MultiCell($colDesc, 6, utf8_decode($row['desc']), 0, 'L');
+            $descHeight = $this->GetY() - $y;
 
-    // Tinggi maksimal baris
-    $lineHeight = max($descHeight, $resultHeight, $rowHeight);
+            $this->SetXY($x + $colDesc, $y);
+            $this->MultiCell($colResult, 6, utf8_decode($row['result']), 0, 'L');
+            $resultHeight = $this->GetY() - $y;
 
-    // Check if adding this row would exceed the page height
-    if ($y + $lineHeight > $this->PageBreakTrigger) {
-        // Add new page and reprint headers
-        $this->AddPage();
-        $this->SetFont('Arial','B',10);
-        $this->Cell(80,8,'Work Description',1,0,'C');
-        $this->Cell(110,8,'Result',1,1,'C');
-        $this->SetFont('Arial','',10);
-        // Reset y to after header
-        $y = $this->GetY();
-    }
+            // Tinggi maksimal baris
+            $lineHeight = max($descHeight, $resultHeight, $rowHeight);
 
-    // Gambar border luar saja (tanpa garis internal MultiCell)
-    $this->Rect($x, $y, $colDesc, $lineHeight);
-    $this->Rect($x + $colDesc, $y, $colResult, $lineHeight);
+            // Check if adding this row would exceed the page height
+            if ($y + $lineHeight > $this->PageBreakTrigger) {
+                // Add new page and reprint headers
+                $this->AddPage();
+                $this->SetFont('Arial','B',10);
+                $this->Cell(80,8,'Work Description',1,0,'C');
+                $this->Cell(110,8,'Result',1,1,'C');
+                $this->SetFont('Arial','',10);
+                // Reset y to after header
+                $y = $this->GetY();
+            }
 
-    // Isi teks di dalam border
-    $this->SetXY($x, $y);
-    $this->MultiCell($colDesc, 6, utf8_decode($row['desc']), 0, 'L');
-    $this->SetXY($x + $colDesc, $y);
-    $this->MultiCell($colResult, 6, utf8_decode($row['result']), 0, 'L');
+            // Gambar border luar saja (tanpa garis internal MultiCell)
+            $this->Rect($x, $y, $colDesc, $lineHeight);
+            $this->Rect($x + $colDesc, $y, $colResult, $lineHeight);
 
-    // Pindah ke bawah
-    $this->SetXY($x, $y + $lineHeight);
-}
+            // Isi teks di dalam border
+            $this->SetXY($x, $y);
+            $this->MultiCell($colDesc, 6, utf8_decode($row['desc']), 0, 'L');
+            $this->SetXY($x + $colDesc, $y);
+            $this->MultiCell($colResult, 6, utf8_decode($row['result']), 0, 'L');
+
+            // Pindah ke bawah
+            $this->SetXY($x, $y + $lineHeight);
+        }
 
         $this->Cell(35,5,'Start Work Time',1,0,'C');
         $this->Cell(65,5,$this->workOrder->start_work_time,1,0,'C');

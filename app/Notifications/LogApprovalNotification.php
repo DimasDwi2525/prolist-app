@@ -31,7 +31,7 @@ class LogApprovalNotification extends Notification implements ShouldQueue
     {
         return [
             'title' => 'Log Approval Updated',
-            'message' => "Your log approval for Project {$this->log->project->project_name} has been {$this->status}",
+            'message' => "Your log approval for Project {$this->log->project->project_number} - {$this->log->project->project_name} has been {$this->status}",
             'log_id' => $this->log->id,
             'project' => $this->log->project->project_number,
             'status' => $this->status,
@@ -44,7 +44,7 @@ class LogApprovalNotification extends Notification implements ShouldQueue
         return [
             'data' => [
                 'title' => 'Log Approval Updated',
-                'message' => "Your log approval for Project {$this->log->project->project_name} has been {$this->status}",
+                'message' => "Your log approval for Project {$this->log->project->project_number} - {$this->log->project->project_name} has been {$this->status}",
                 'log_id' => $this->log->id,
                 'project' => $this->log->project->project_number,
                 'status' => $this->status,

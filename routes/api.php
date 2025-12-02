@@ -441,4 +441,11 @@ Route::middleware('auth:api')->group(function () {
     Route::put('destinations/{id}', [DestinationApiController::class, 'update']);
     Route::delete('destinations/{id}', [DestinationApiController::class, 'destroy']);
 
+    // Admin Broadcast routes
+    Route::prefix('admin')->group(function () {
+        Route::post('broadcast/all', [\App\Http\Controllers\API\AdminBroadcastController::class, 'broadcastToAll']);
+        Route::post('broadcast/users', [\App\Http\Controllers\API\AdminBroadcastController::class, 'sendToSpecificUsers']);
+        Route::get('broadcast/users', [\App\Http\Controllers\API\AdminBroadcastController::class, 'getOnlineUsers']);
+    });
+
 });

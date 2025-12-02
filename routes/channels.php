@@ -44,6 +44,21 @@ Broadcast::channel('online-users', function ($user) {
     ];
 });
 
+// Admin broadcast channels
+Broadcast::channel('admin.messages', function ($user) {
+    // Allow all authenticated users to listen to admin broadcasts
+    return true;
+});
+
+Broadcast::channel('admin.messages.{userId}', function ($user, $userId) {
+    // Only allow users to listen to their own private admin messages
+    return (int) $user->id === (int) $userId;
+});
+
+
+
+
+
 
 
 
