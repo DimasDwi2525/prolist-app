@@ -97,7 +97,7 @@ class ApprovallController extends Controller
         }
 
         // Fire event for notification
-        event(new \App\Events\PhcApprovalUpdated($phc));
+        event(new \App\Events\PhcApprovalUpdated($phc, [$phc->users_id]));
 
         // Fire event to update approval page
         event(new ApprovalPageUpdatedEvent(
@@ -189,7 +189,7 @@ class ApprovallController extends Controller
         // So exclude creator from notifications and events even if they are the approver
 
         if ($wo->creator && $wo->creator->id !== $user->id) {
-            event(new \App\Events\WorkOrderApprovalUpdated($wo));
+            event(new \App\Events\WorkOrderApprovalUpdated($wo, [$wo->creator->id]));
         }
 
         // Fire event to update approval page

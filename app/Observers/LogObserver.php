@@ -31,7 +31,7 @@ class LogObserver
     {
         // Jika status log berubah (approved/rejected), kirim event approval
         if ($log->wasChanged('status') && in_array($log->status, ['approved', 'rejected'])) {
-            event(new LogApprovalUpdated($log));
+            event(new LogApprovalUpdated($log, [$log->users_id]));
         }
 
         event(new DashboardUpdatedEvent());
