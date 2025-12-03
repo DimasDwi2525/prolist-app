@@ -29,17 +29,8 @@ class AdminBroadcastEvent implements ShouldBroadcast
 
     public function broadcastOn()
     {
-        if ($this->messageType === 'private' && $this->targetUsers) {
-            // Send to specific users via private channels
-            $channels = [];
-            foreach ($this->targetUsers as $userId) {
-                $channels[] = new PrivateChannel('admin.messages.' . $userId);
-            }
-            return $channels;
-        } else {
-            // Send to all users via public channel
-            return new Channel('admin.messages');
-        }
+        // Always send to all users via public channel
+        return new Channel('admin.messages');
     }
 
     public function broadcastAs(): string
@@ -54,6 +45,7 @@ class AdminBroadcastEvent implements ShouldBroadcast
             'sender' => $this->sender,
             'timestamp' => now()->toISOString(),
             'type' => $this->messageType,
+            'targetUsers' => $this->targetUsers, // Include targetUsers for private messages
         ];
     }
 }

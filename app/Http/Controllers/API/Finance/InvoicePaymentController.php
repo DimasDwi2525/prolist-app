@@ -28,13 +28,13 @@ class InvoicePaymentController extends Controller
 
         $invoice = Invoice::findOrFail($invoiceId);
         $totalPaid = $payments->sum('payment_amount');
-        $remainingPayment = $invoice->expected_payment - $totalPaid;
+        $remainingPayment = $invoice->invoice_value - $totalPaid;
 
         return response()->json([
             'payments' => $payments,
             'total_paid' => $totalPaid,
             'remaining_payment' => $remainingPayment,
-            'expected_payment' => $invoice->expected_payment
+            'expected_payment' => $invoice->invoice_value
         ]);
     }
 
@@ -56,7 +56,7 @@ class InvoicePaymentController extends Controller
 
         // Check if adding this payment would exceed invoice value
         $currentTotal = InvoicePayment::where('invoice_id', $request->invoice_id)->sum('payment_amount');
-        if ($currentTotal + $request->payment_amount > $invoice->expected_payment) {
+        if ($currentTotal + $request->payment_amount > $invoice->invoice_value) {
             return response()->json(['error' => 'Payment total exceeds invoice value'], 400);
         }
 
@@ -102,7 +102,7 @@ class InvoicePaymentController extends Controller
         if ($request->has('payment_amount')) {
             $invoice = $payment->invoice;
             $currentTotal = InvoicePayment::where('invoice_id', $payment->invoice_id)->where('id', '!=', $id)->sum('payment_amount');
-            if ($currentTotal + $request->payment_amount > $invoice->expected_payment) {
+            if ($currentTotal + $request->payment_amount > $invoice->invoice_value) {
                 return response()->json(['error' => 'Payment total exceeds invoice value'], 400);
             }
         }
@@ -161,8 +161,8 @@ class InvoicePaymentController extends Controller
                 'message' => 'Payment total exceeds invoice value',
                 'current_total' => $currentTotal,
                 'new_total' => $newTotal,
-                'expected_value' => $invoice->expected_value,
-                'exceeds_by' => $newTotal - $invoice->expected_value
+                'expected_value' => $invoice->invoice_value,
+                'exceeds_by' => $newTotal - $invoice->invoice_value
             ], 200);
         }
 
@@ -171,7 +171,7 @@ class InvoicePaymentController extends Controller
             'message' => 'Payment amount is within invoice limits',
             'current_total' => $currentTotal,
             'new_total' => $newTotal,
-            'expected_value' => $invoice->expected_value
+            'expected_value' => $invoice->invoice_value
         ]);
     }
 }

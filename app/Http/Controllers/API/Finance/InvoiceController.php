@@ -89,17 +89,14 @@ class InvoiceController extends Controller
         }
 
         // Determine invoice sequence: custom or auto-generated
-        if ($request->has('invoice_sequence')) {
-            $globalSequence = $request->invoice_sequence;
-            // Check uniqueness globally for the year (across all invoice types)
-            $year = date('y'); // e.g., '25'
-            $sequencePadded = str_pad($globalSequence, 4, '0', STR_PAD_LEFT);
-            $yearSequence = $year . '/' . $sequencePadded;
-            if (Invoice::where('invoice_id', 'like', '%' . $yearSequence)->exists()) {
-                return response()->json(['error' => 'Invoice sequence already exists'], 400);
-            }
-        } else {
-            $globalSequence = $this->getGlobalInvoiceSequence();
+        $globalSequence = $request->has('invoice_sequence') && $request->invoice_sequence ? (int)$request->invoice_sequence : $this->getGlobalInvoiceSequence();
+
+        // Check uniqueness globally for the year (across all invoice types)
+        $year = date('y'); // e.g., '25'
+        $sequencePadded = str_pad($globalSequence, 4, '0', STR_PAD_LEFT);
+        $yearSequence = $year . '/' . $sequencePadded;
+        if (Invoice::where('invoice_id', 'like', '%' . $yearSequence)->exists()) {
+            return response()->json(['error' => 'Invoice sequence already exists'], 400);
         }
 
         // Generate invoice_id based on template IP25001 (global sequence)
@@ -478,7 +475,7 @@ class InvoiceController extends Controller
             'invoice_sequence' => 'nullable|integer|min:1',
         ]);
 
-        $globalSequence = $request->has('invoice_sequence') ? $request->invoice_sequence : $this->getGlobalInvoiceSequence();
+        $globalSequence = $request->has('invoice_sequence') && $request->invoice_sequence ? (int)$request->invoice_sequence : $this->getGlobalInvoiceSequence();
         $nextInvoiceId = $this->generateInvoiceIdGlobal($request->invoice_type_id, $globalSequence);
 
         return response()->json(['next_invoice_id' => $nextInvoiceId]);
@@ -541,7 +538,7 @@ class InvoiceController extends Controller
                     $query->select('invoice_id', 'payment_amount');
                 }
             ])
-            ->orderBy('created_at', 'desc');
+            ->orderByRaw("CAST(RIGHT(invoice_id, 4) AS INT) DESC");
 
         // 🔹 Filter berdasarkan range
         switch ($rangeType) {
