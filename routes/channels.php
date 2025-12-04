@@ -44,6 +44,18 @@ Broadcast::channel('online-users', function ($user) {
     ];
 });
 
+Broadcast::channel('admin.messages', function ($user) {
+    return true; // Public channel for admin broadcasts
+});
+
+Broadcast::channel('user.{id}', function ($user, $id) {
+    return (int) $user->id === (int) $id;
+});
+
+Broadcast::channel('role.{role}', function ($user, $role) {
+    return $user->role && $user->role->name === $role;
+});
+
 
 
 

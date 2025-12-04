@@ -42,6 +42,7 @@ use App\Http\Controllers\API\SUC\DestinationApiController;
 use App\Http\Controllers\API\users\DepartmentController;
 use App\Http\Controllers\API\users\RoleController;
 use App\Http\Controllers\API\users\UsersController;
+use App\Http\Controllers\API\MessageController;
 use App\Http\Controllers\API\Finance\InvoiceTypeController;
 use App\Http\Controllers\API\Finance\InvoicePaymentController;
 use App\Http\Controllers\API\Finance\RequestInvoiceApiController;
@@ -187,6 +188,12 @@ Route::middleware('auth:api')->group(function () {
     Route::get('/notifications/count', [NotificationController::class, 'count']);
     Route::post('/notifications/{id}/read', [NotificationController::class, 'markAsRead']);
     Route::post('/notifications/mark-all-read', [NotificationController::class, 'markAllAsRead']);
+
+    // Message routes
+    Route::post('/messages/send-to-user', [MessageController::class, 'sendToUser']);
+    Route::post('/messages/send-to-role', [MessageController::class, 'sendToRole']);
+    Route::post('/messages/mark-as-read', [MessageController::class, 'markAsRead']);
+    Route::get('/messages/unread-count', [MessageController::class, 'getUnreadCount']);
 
     
 
@@ -441,11 +448,5 @@ Route::middleware('auth:api')->group(function () {
     Route::put('destinations/{id}', [DestinationApiController::class, 'update']);
     Route::delete('destinations/{id}', [DestinationApiController::class, 'destroy']);
 
-    // Admin Broadcast routes
-    Route::prefix('admin')->group(function () {
-        Route::post('broadcast/all', [\App\Http\Controllers\API\AdminBroadcastController::class, 'broadcastToAll']);
-        Route::post('broadcast/users', [\App\Http\Controllers\API\AdminBroadcastController::class, 'sendToSpecificUsers']);
-        Route::get('broadcast/users', [\App\Http\Controllers\API\AdminBroadcastController::class, 'getOnlineUsers']);
-    });
 
 });
