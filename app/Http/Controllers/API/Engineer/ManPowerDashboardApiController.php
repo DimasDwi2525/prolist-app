@@ -238,7 +238,6 @@ class ManPowerDashboardApiController extends Controller
                 ];
             })
             ->sortByDesc('delay_days')
-            ->take(5)
             ->values();
 
         return [

@@ -27,7 +27,7 @@ class LogController extends Controller
     // Show specific log
     public function show($id)
     {
-        $log = Log::with(['user', 'project', 'category', 'closer', 'responseUser', 'approvals'])->find($id);
+        $log = Log::with(['user', 'project.client', 'project.quotation.client', 'category', 'closer', 'responseUser', 'approvals'])->find($id);
 
         if (!$log) {
             return response()->json(['message' => 'Log not found'], 404);
