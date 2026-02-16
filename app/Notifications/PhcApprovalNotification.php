@@ -29,25 +29,29 @@ class PhcApprovalNotification extends Notification implements ShouldQueue
 
     public function toDatabase($notifiable)
     {
+        $statusLabel = $this->status === PHC::STATUS_APPROVED ? 'approved' : 'waiting approval';
+
         return [
             'title' => 'PHC Approval Updated',
-            'message' => "Your PHC approval for Project {$this->phc->project->project_number} - {$this->phc->project->project_name} has been {$this->status}",
+            'message' => "Your PHC approval for Project {$this->phc->project->project_number} - {$this->phc->project->project_name} has been {$statusLabel}",
             'phc_id' => $this->phc->id,
             'project' => $this->phc->project->project_number,
-            'status' => $this->status,
+            'status' => $statusLabel,
             'type' => 'phc_update',
         ];
     }
 
     public function toBroadcast($notifiable)
     {
+        $statusLabel = $this->status === PHC::STATUS_APPROVED ? 'approved' : 'waiting approval';
+
         return [
             'data' => [
                 'title' => 'PHC Approval Updated',
-                'message' => "Your PHC approval for Project {$this->phc->project->project_number} - {$this->phc->project->project_name} has been {$this->status}",
+                'message' => "Your PHC approval for Project {$this->phc->project->project_number} - {$this->phc->project->project_name} has been {$statusLabel}",
                 'phc_id' => $this->phc->id,
                 'project' => $this->phc->project->project_number,
-                'status' => $this->status,
+                'status' => $statusLabel,
                 'type' => 'phc_update',
             ],
         ];

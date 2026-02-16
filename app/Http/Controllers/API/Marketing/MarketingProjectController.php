@@ -7,9 +7,12 @@ use App\Models\Project;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log as FacadesLog;
 
+
+
 class MarketingProjectController extends Controller
 {
     //
+
     public function index(Request $request)
     {
         $yearParam = $request->query('year');
@@ -21,10 +24,18 @@ class MarketingProjectController extends Controller
         $fromDate = $request->query('from_date');
         $toDate = $request->query('to_date');
 
-        // Inisialisasi query
-        $projects = Project::with(['category', 'quotation.client', 'client', 'statusProject']);
+        // Target date filter parameters
+        $enableTargetDateFilter = $request->boolean('enable_target_date_filter', false); // NEW PARAMETER
+        $targetDateRangeType = $request->query('target_date_range_type'); // yearly, monthly, weekly, custom
+        $targetDateMonthParam = $request->query('target_date_month'); // 1-12
+        $targetDateFrom = $request->query('target_date_from');
+        $targetDateTo = $request->query('target_date_to');
 
-        // Filter berdasarkan range type
+
+        // Inisialisasi query dengan eager loading
+        $projects = Project::with(['category', 'quotation.client', 'client', 'statusProject', 'phc']);
+
+        // Apply PO Date Filter (Always applied)
         if ($rangeType === 'monthly' && $monthParam) {
             $projects->whereYear('po_date', $year)
                      ->whereMonth('po_date', $monthParam);
@@ -37,9 +48,62 @@ class MarketingProjectController extends Controller
             $projects->whereYear('po_date', $year);
         }
 
+        // Apply Target Date Filter (Only if enabled)
+        if ($enableTargetDateFilter && $targetDateRangeType) {
+            $targetYear = $request->query('target_year') ? (int)$request->query('target_year') : now()->year;
+            $targetDateRange = null;
+
+            if ($targetDateRangeType === 'monthly' && $targetDateMonthParam) {
+                $month = (int)$targetDateMonthParam;
+                if ($month >= 1 && $month <= 12) {
+                    $startDate = \Carbon\Carbon::createFromDate($targetYear, $month, 1)->startOfDay();
+                    $endDate = \Carbon\Carbon::createFromDate($targetYear, $month, 1)->endOfMonth()->endOfDay();
+                    $targetDateRange = [$startDate, $endDate];
+                }
+            } elseif ($targetDateRangeType === 'weekly') {
+                $startDate = now()->startOfWeek()->startOfDay();
+                $endDate = now()->endOfWeek()->endOfDay();
+                $targetDateRange = [$startDate, $endDate];
+             
+            } elseif ($targetDateRangeType === 'custom' && $targetDateFrom && $targetDateTo) {
+                try {
+                    $startDate = \Carbon\Carbon::parse($targetDateFrom)->startOfDay();
+                    $endDate = \Carbon\Carbon::parse($targetDateTo)->endOfDay();
+                    $targetDateRange = [$startDate, $endDate];
+                    
+                } catch (\Exception $e) {
+                    $targetDateRange = null;
+                }
+            } elseif ($targetDateRangeType === 'yearly') {
+                $startDate = \Carbon\Carbon::createFromDate($targetYear, 1, 1)->startOfDay();
+                $endDate = \Carbon\Carbon::createFromDate($targetYear, 12, 31)->endOfDay();
+                $targetDateRange = [$startDate, $endDate];
+            }
+
+
+            // Apply target date filter using left join for better performance
+            if ($targetDateRange) {
+                $projects->leftJoin('phcs', 'projects.pn_number', '=', 'phcs.project_id')
+                         ->where(function($q) use ($targetDateRange) {
+                             // Project target_dates dalam range ATAU PHC target_finish_date dalam range
+                             $q->where('projects.target_dates', '>=', $targetDateRange[0])
+                               ->where('projects.target_dates', '<=', $targetDateRange[1])
+                               ->orWhere(function($subQ) use ($targetDateRange) {
+                                   $subQ->whereNotNull('phcs.target_finish_date')
+                                        ->where('phcs.target_finish_date', '>=', $targetDateRange[0])
+                                        ->where('phcs.target_finish_date', '<=', $targetDateRange[1]);
+                               });
+                         });
+            }
+        }
+
+        
+
+        // Execute query with ordering
         $projects = $projects
-            ->orderByRaw('CAST(LEFT(CAST(pn_number AS VARCHAR), 2) AS INT) DESC') // ambil 2 digit pertama sebagai tahun
-            ->orderByRaw('CAST(SUBSTRING(CAST(pn_number AS VARCHAR), 3, LEN(CAST(pn_number AS VARCHAR)) - 2) AS INT) DESC') // ambil nomor urut
+            ->select('projects.*') // Important: select all project columns to avoid conflicts with join
+            ->orderByRaw('CAST(LEFT(CAST(pn_number AS VARCHAR), 2) AS INT) DESC')
+            ->orderByRaw('CAST(SUBSTRING(CAST(pn_number AS VARCHAR), 3, LEN(CAST(pn_number AS VARCHAR)) - 2) AS INT) DESC')
             ->get();
 
         return response()->json([
@@ -52,6 +116,12 @@ class MarketingProjectController extends Controller
                 'month' => $monthParam,
                 'from_date' => $fromDate,
                 'to_date' => $toDate,
+                'target_year' => $request->query('target_year'),
+                'target_date_range_type' => $targetDateRangeType,
+                'target_date_month' => $targetDateMonthParam,
+                'target_date_from' => $targetDateFrom,
+                'target_date_to' => $targetDateTo,
+                'enable_target_date_filter' => $enableTargetDateFilter,
                 'available_years' => $availableYears,
             ],
         ]);

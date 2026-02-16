@@ -10,6 +10,7 @@ use App\Models\PHC;
 use App\Models\WorkOrder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Notifications\DatabaseNotification;
 
 class ApprovallController extends Controller
 {
@@ -43,6 +44,7 @@ class ApprovallController extends Controller
         ]);
 
         $approval = Approval::where('user_id', $request->user()->id)
+            ->where('approvable_type', PHC::class)
             ->with('user', 'approvable')
             ->findOrFail($id);
 
@@ -71,33 +73,101 @@ class ApprovallController extends Controller
             'validated_at' => now(),
         ]);
 
-        // Jika approval HO/validator pertama kali
+        // PHC approval flow:
+        // 1) PIC Marketing approve
+        // 2) HO Engineering approve
+        //    Jika HO Engineering belum ditentukan, PM/PC pertama yang approve akan menjadi HO Engineering.
         $phc = $approval->approvable;
-        if ($approval->approvable_type === PHC::class && in_array($user->role->name, ['project manager', 'project controller', 'super_admin'])) {
-            if (!$phc->ho_engineering_id) {
-                $phc->update(['ho_engineering_id' => $user->id]);
+        $roleName = strtolower($user->role->name ?? '');
+        $isPmOrPc = in_array($roleName, ['project manager', 'project controller'], true);
+        $isDelegatedEngineeringApprover = $request->status === 'approved'
+            && (bool) $phc->ho_engineering_id
+            && $isPmOrPc
+            && (int) $user->id !== (int) $phc->ho_engineering_id;
 
-                // Hapus semua approval validator lain yang masih pending
-                Approval::where('approvable_type', PHC::class)
-                    ->where('approvable_id', $phc->id)
-                    ->where('status', 'pending')
-                    ->where('user_id', '!=', $user->id)
-                    ->delete();
+        if ($request->status === 'approved' && !$phc->ho_engineering_id && $isPmOrPc) {
+            $phc->update(['ho_engineering_id' => $user->id]);
+
+            $pendingPmPcApprovals = Approval::where('approvable_type', PHC::class)
+                ->where('approvable_id', $phc->id)
+                ->where('status', 'pending')
+                ->where('user_id', '!=', $user->id)
+                ->whereHas('user.role', function ($q) {
+                    $q->whereIn('name', ['project manager', 'project controller']);
+                })
+                ->get();
+
+            $removedUserIds = $pendingPmPcApprovals->pluck('user_id')->all();
+            foreach ($pendingPmPcApprovals as $pendingApproval) {
+                $pendingApproval->delete();
             }
+
+            $this->deletePhcValidationNotifications($phc->id, $removedUserIds);
         }
 
-        // Cek minimal 3 approval (HO Marketing + PIC Marketing + HO Engineering)
-        $approvedCount = Approval::where('approvable_type', PHC::class)
+        // Jika approval engineering didelegasikan ke PM/PC,
+        // simpan approver yang approve dan hapus pending approval PM/PC lain.
+        if ($isDelegatedEngineeringApprover) {
+            $pendingPmPcApprovals = Approval::where('approvable_type', PHC::class)
+                ->where('approvable_id', $phc->id)
+                ->where('status', 'pending')
+                ->where('user_id', '!=', $user->id)
+                ->whereHas('user.role', function ($q) {
+                    $q->whereIn('name', ['project manager', 'project controller']);
+                })
+                ->get();
+
+            $removedUserIds = $pendingPmPcApprovals->pluck('user_id')->all();
+            foreach ($pendingPmPcApprovals as $pendingApproval) {
+                $pendingApproval->delete();
+            }
+
+            $this->deletePhcValidationNotifications($phc->id, $removedUserIds);
+        }
+
+        $picMarketingApproved = false;
+        if ($phc->pic_marketing_id) {
+            $picMarketingApproved = Approval::where('approvable_type', PHC::class)
+                ->where('approvable_id', $phc->id)
+                ->where('user_id', $phc->pic_marketing_id)
+                ->where('status', 'approved')
+                ->exists();
+        }
+
+        $hoEngineeringApproved = false;
+        if ($phc->ho_engineering_id) {
+            $hoEngineeringApproved = Approval::where('approvable_type', PHC::class)
+                ->where('approvable_id', $phc->id)
+                ->where('user_id', $phc->ho_engineering_id)
+                ->where('status', 'approved')
+                ->exists();
+        }
+
+        $delegatedEngineeringApproved = Approval::where('approvable_type', PHC::class)
             ->where('approvable_id', $phc->id)
             ->where('status', 'approved')
-            ->count();
+            ->where('user_id', '!=', $phc->ho_engineering_id)
+            ->whereHas('user.role', function ($q) {
+                $q->whereIn('name', ['project manager', 'project controller']);
+            })
+            ->exists();
 
-        if ($approvedCount >= 3) {
-            $phc->update(['status' => 'ready']);
+        $engineeringApproved = $hoEngineeringApproved || $delegatedEngineeringApproved;
+
+        if ($picMarketingApproved && $engineeringApproved) {
+            $phc->update(['status' => PHC::STATUS_APPROVED]);
+        } else {
+            $phc->update(['status' => PHC::STATUS_WAITING_APPROVAL]);
         }
 
+        $statusNotificationRecipients = array_values(array_unique(array_filter([
+            $phc->created_by,
+            $phc->pic_marketing_id,
+            $phc->ho_engineering_id,
+        ])));
+
         // Fire event for notification
-        event(new \App\Events\PhcApprovalUpdated($phc, [$phc->users_id]));
+        event(new \App\Events\PhcApprovalUpdated($phc, $statusNotificationRecipients));
 
         // Fire event to update approval page
         event(new ApprovalPageUpdatedEvent(
@@ -112,7 +182,32 @@ class ApprovallController extends Controller
             'message' => "Approval berhasil {$request->status}",
             'approval' => $approval,
             'phc_status' => $phc->status,
+            'phc_status_label' => $phc->display_status,
+            'pic_marketing_approved' => $picMarketingApproved,
+            'ho_engineering_approved' => $hoEngineeringApproved,
+            'delegated_engineering_approved' => $delegatedEngineeringApproved,
+            'engineering_approved' => $engineeringApproved,
         ]);
+    }
+
+    private function deletePhcValidationNotifications(int $phcId, array $userIds): void
+    {
+        if (empty($userIds)) {
+            return;
+        }
+
+        $notifications = DatabaseNotification::query()
+            ->whereIn('notifiable_id', $userIds)
+            ->where('type', \App\Notifications\PhcValidationRequested::class)
+            ->get();
+
+        foreach ($notifications as $notification) {
+            $payload = is_array($notification->data) ? $notification->data : [];
+
+            if ((int) ($payload['phc_id'] ?? 0) === $phcId) {
+                $notification->delete();
+            }
+        }
     }
 
     // Update status approval WO

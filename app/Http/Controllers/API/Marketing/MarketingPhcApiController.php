@@ -10,8 +10,6 @@ use App\Models\PHC;
 use App\Models\Project;
 use App\Models\Retention;
 use App\Models\User;
-use App\Notifications\PhcCreated;
-use App\Notifications\PhcValidationRequested;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -31,7 +29,7 @@ class MarketingPhcApiController extends Controller
             'client_site_representatives' => 'nullable|string',
             'client_site_address' => 'nullable|string',
             'site_phone_number' => 'nullable|string',
-            'pic_marketing_id' => 'nullable|exists:users,id',
+            'pic_marketing_id' => 'required|exists:users,id',
             'pic_engineering_id' => 'nullable|exists:users,id',
             'ho_marketings_id' => 'nullable|exists:users,id',
             'ho_engineering_id' => 'nullable|exists:users,id',
@@ -55,8 +53,8 @@ class MarketingPhcApiController extends Controller
         $validated['penalty'] = $request->penalty;
 
         $validated['created_by'] = Auth::id();
-        // $validated['status'] = 'pending';
-        $validated['status'] = 'ready';
+        // waiting approval (stored as `pending` for DB compatibility)
+        $validated['status'] = PHC::STATUS_WAITING_APPROVAL;
 
         // 🔹 Buat PHC
         $phc = PHC::create($validated);
@@ -87,37 +85,29 @@ class MarketingPhcApiController extends Controller
         $notifyUsers = [];
         $approverIds = [];
 
-        // Marketing users (jika ada)
-        $marketingUsers = array_filter([
-            $validated['ho_marketings_id'] ?? null,
-            $validated['pic_marketing_id'] ?? null,
-        ]);
-
-        // Simpan marketing ke approver & notif
-        foreach ($marketingUsers as $mid) {
-            $approverIds[] = $mid;
-            $notifyUsers[] = $mid;
-        }
+        // PIC Marketing wajib approve
+        $picMarketingId = $validated['pic_marketing_id'];
+        $approverIds[] = $picMarketingId;
+        $notifyUsers[] = $picMarketingId;
 
         // Engineering logic
         $hoEngineeringId = $validated['ho_engineering_id'] ?? null;
 
-        // Always include engineering roles regardless of ho_engineering_id
-        $engineeringRoles = ['project manager', 'project controller', 'engineering_director'];
-
-        $engineeringUsers = User::whereHas('role', fn($q) =>
-            $q->whereIn('name', $engineeringRoles)
-        )->pluck('id')->toArray();
-
-        foreach ($engineeringUsers as $eid) {
-            $approverIds[] = $eid;
-            $notifyUsers[] = $eid;
-        }
-
-        // If HO Engineering is specified, add it as well (if not already included)
-        if ($hoEngineeringId && !in_array($hoEngineeringId, $approverIds)) {
+        // Jika HO Engineering sudah ditentukan, kirim approval langsung ke user tsb
+        if ($hoEngineeringId) {
             $approverIds[] = $hoEngineeringId;
             $notifyUsers[] = $hoEngineeringId;
+        } else {
+            // Jika HO Engineering kosong, kirim approval ke semua PM + PC
+            $engineeringFallbackRoles = ['project manager', 'project controller'];
+            $engineeringUsers = User::whereHas('role', fn($q) =>
+                $q->whereIn('name', $engineeringFallbackRoles)
+            )->pluck('id')->toArray();
+
+            foreach ($engineeringUsers as $eid) {
+                $approverIds[] = $eid;
+                $notifyUsers[] = $eid;
+            }
         }
 
         // Bersihkan hasil
@@ -320,6 +310,98 @@ class MarketingPhcApiController extends Controller
             'success' => true,
             'message' => 'PHC berhasil diperbarui',
             'data' => $phc
+        ]);
+    }
+
+    public function delegateHoEngineering(Request $request, $id)
+    {
+        $phc = PHC::find($id);
+
+        if (!$phc) {
+            return response()->json([
+                'success' => false,
+                'message' => 'PHC tidak ditemukan'
+            ], 404);
+        }
+
+        if (!$phc->ho_engineering_id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Delegation tidak diperlukan karena HO Engineering belum ditentukan'
+            ], 422);
+        }
+
+        if ($phc->status === PHC::STATUS_APPROVED) {
+            return response()->json([
+                'success' => false,
+                'message' => 'PHC sudah approved'
+            ], 422);
+        }
+
+        
+
+        $delegateUserIds = User::whereHas('role', function ($q) {
+            $q->whereIn('name', ['project manager', 'project controller']);
+        })->pluck('id')->all();
+
+        if (empty($delegateUserIds)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'User project manager / project controller tidak ditemukan'
+            ], 422);
+        }
+
+        // Hapus approval pending milik HO Engineering agar approval engineering bisa diwakilkan.
+        Approval::where('approvable_type', PHC::class)
+            ->where('approvable_id', $phc->id)
+            ->where('user_id', $phc->ho_engineering_id)
+            ->where('status', 'pending')
+            ->delete();
+
+        $createdApprovals = collect();
+        foreach ($delegateUserIds as $delegateUserId) {
+            $alreadyHasPendingOrApproved = Approval::where('approvable_type', PHC::class)
+                ->where('approvable_id', $phc->id)
+                ->where('user_id', $delegateUserId)
+                ->whereIn('status', ['pending', 'approved'])
+                ->exists();
+
+            if ($alreadyHasPendingOrApproved) {
+                continue;
+            }
+
+            $approval = Approval::create([
+                'approvable_type' => PHC::class,
+                'type'            => 'PHC',
+                'approvable_id'   => $phc->id,
+                'user_id'         => $delegateUserId,
+                'status'          => 'pending',
+            ]);
+
+            $createdApprovals->push($approval);
+
+            event(new ApprovalPageUpdatedEvent(
+                'PHC',
+                $approval->id,
+                'pending',
+                PHC::class,
+                $phc->id
+            ));
+        }
+
+        $notifyUsers = $createdApprovals->pluck('user_id')->values()->all();
+        if (!empty($notifyUsers)) {
+            event(new PhcCreatedEvent($phc, $notifyUsers));
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Delegation approval berhasil dikirim ke Project Manager dan Project Controller',
+            'data' => [
+                'phc_id' => $phc->id,
+                'ho_engineering_id' => $phc->ho_engineering_id,
+                'delegated_user_ids' => $notifyUsers,
+            ],
         ]);
     }
 

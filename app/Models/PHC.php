@@ -13,6 +13,9 @@ class PHC extends Model
 
     protected $table = "phcs";
 
+    public const STATUS_WAITING_APPROVAL = 'pending';
+    public const STATUS_APPROVED = 'ready';
+
     protected $fillable = [
         'project_id',
         'ho_marketings_id',
@@ -40,6 +43,8 @@ class PHC extends Model
         'retention_months',
         'warranty_date'
     ];
+
+    protected $appends = ['display_status'];
 
     public function project()
     {
@@ -104,6 +109,14 @@ class PHC extends Model
                 // ]);
             }
         });
+    }
+
+    public function getDisplayStatusAttribute(): string
+    {
+        return match ($this->status) {
+            self::STATUS_APPROVED => 'approved',
+            default => 'waiting approval',
+        };
     }
 
 }

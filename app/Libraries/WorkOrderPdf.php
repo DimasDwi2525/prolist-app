@@ -202,16 +202,25 @@ class WorkOrderPdf extends FPDF
         }
 
         $this->Cell(35,5,'Start Work Time',1,0,'C');
-        $this->Cell(65,5,$this->workOrder->start_work_time,1,0,'C');
+        $this->Cell(65,5,$this->workOrder->start_work_time ? $this->workOrder->start_work_time->format('H:i') : '-',1,0,'C');
         $this->Cell(20,10,'Continue on',1,0,'C');
         $this->Cell(10,5,'Date',1,0,'C');
         $this->Cell(60,5,$this->workOrder->continue_date ? $this->workOrder->continue_date->format('d-m-Y') : '-',1,1,'C');
 
         $this->Cell(35,5,'Stop Work Time',1,0,'C');
-        $this->Cell(65,5,$this->workOrder->stop_work_time,1,0,'C');
+        $this->Cell(65,5,$this->workOrder->stop_work_time ? $this->workOrder->stop_work_time->format('H:i') : '-',1,0,'C');
         $this->Cell(20,5,'',0,0,'C');
         $this->Cell(10,5,'Time',1,0,'C');
-        $this->Cell(60,5,$this->workOrder->continue_time,1,1,'C');
+        $this->Cell(
+            60,
+            5,
+            $this->workOrder->continue_time
+                ? \Carbon\Carbon::parse($this->workOrder->continue_time)->format('H:i')
+                : '-',
+            1,
+            1,
+            'C'
+        );
 
         $this->Cell(0, 15, "Client Note:", 1, 'L');
 

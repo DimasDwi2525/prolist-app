@@ -27,19 +27,22 @@ class EngineerDashboardApiController extends Controller
 
     private function getKpis(Carbon $now)
     {
+        $startOfCurrentMonth = $now->copy()->startOfMonth();
+        $startOfNextMonth = $startOfCurrentMonth->copy()->addMonth();
+
         $overdue = $this->getProjectsByCriteria($now, function($q) use ($now) {
             $q->whereNotNull('target_finish_date')->where('target_finish_date', '<', $now);
         }, true);
 
-        $dueThisMonth = $this->getProjectsByCriteria($now, function($q) use ($now) {
+        $dueThisMonth = $this->getProjectsByCriteria($now, function($q) use ($now, $startOfNextMonth) {
             $q->whereNotNull('target_finish_date')
-              ->whereMonth('target_finish_date', $now->month)
-              ->whereYear('target_finish_date', $now->year)
-              ->where('target_finish_date', '>=', $now);
+              ->where('target_finish_date', '>=', $now)
+              ->where('target_finish_date', '<', $startOfNextMonth);
         }, true);
 
-        $onTrack = $this->getProjectsByCriteria($now, function($q) use ($now) {
-            $q->whereNotNull('target_finish_date')->where('target_finish_date', '>=', $now);
+        $onTrack = $this->getProjectsByCriteria($now, function($q) use ($startOfNextMonth) {
+            $q->whereNotNull('target_finish_date')
+              ->where('target_finish_date', '>=', $startOfNextMonth);
         }, true);
 
         $totalOutstanding = $overdue['count'] + $dueThisMonth['count'] + $onTrack['count'];
@@ -93,6 +96,9 @@ class EngineerDashboardApiController extends Controller
 
     private function getCharts(Carbon $now)
     {
+        $startOfCurrentMonth = $now->copy()->startOfMonth();
+        $startOfNextMonth = $startOfCurrentMonth->copy()->addMonth();
+
         // Get current year from pn_number (assuming pn_number starts with year like '25' for 2025)
         $currentYear = Project::selectRaw('LEFT(pn_number, 2) as year_short')
             ->distinct()
@@ -155,17 +161,17 @@ class EngineerDashboardApiController extends Controller
             $q->whereNotIn('name', ['Engineering Work Completed', 'Project Finished', 'Invoice On Progress', 'Documents Completed', 'Cancelled']);
         })->count();
 
-        $dueThisMonthCount = Project::whereHas('phc', function($q) use ($now) {
+        $dueThisMonthCount = Project::whereHas('phc', function($q) use ($now, $startOfNextMonth) {
             $q->whereNotNull('target_finish_date')
-              ->whereMonth('target_finish_date', $now->month)
-              ->whereYear('target_finish_date', $now->year)
-              ->where('target_finish_date', '>=', $now);
+              ->where('target_finish_date', '>=', $now)
+              ->where('target_finish_date', '<', $startOfNextMonth);
         })->whereHas('statusProject', function($q) {
             $q->whereNotIn('name', ['Engineering Work Completed', 'Project Finished', 'Invoice On Progress', 'Documents Completed', 'Cancelled']);
         })->count();
 
-        $onTrackCount = Project::whereHas('phc', function($q) use ($now) {
-            $q->whereNotNull('target_finish_date')->where('target_finish_date', '>=', $now);
+        $onTrackCount = Project::whereHas('phc', function($q) use ($startOfNextMonth) {
+            $q->whereNotNull('target_finish_date')
+              ->where('target_finish_date', '>=', $startOfNextMonth);
         })->whereHas('statusProject', function($q) {
             $q->whereNotIn('name', ['Engineering Work Completed', 'Project Finished', 'Invoice On Progress', 'Documents Completed', 'Cancelled']);
         })->count();
@@ -181,6 +187,9 @@ class EngineerDashboardApiController extends Controller
 
     private function getProjectLists(Carbon $now)
     {
+        $startOfCurrentMonth = $now->copy()->startOfMonth();
+        $startOfNextMonth = $startOfCurrentMonth->copy()->addMonth();
+
         // Upcoming Projects
         $upcomingProjects = $this->getProjectsByCriteria($now, function($q) use ($now) {
             $q->whereNotNull('target_finish_date')
@@ -188,15 +197,15 @@ class EngineerDashboardApiController extends Controller
               ->where('target_finish_date', '<=', $now->copy()->addDays(30));
         }, true)['list'];
 
-        $projectDueThisMonthList = $this->getProjectsByCriteria($now, function($q) use ($now) {
+        $projectDueThisMonthList = $this->getProjectsByCriteria($now, function($q) use ($now, $startOfNextMonth) {
             $q->whereNotNull('target_finish_date')
-              ->whereMonth('target_finish_date', $now->month)
-              ->whereYear('target_finish_date', $now->year)
-              ->where('target_finish_date', '>=', $now);
+              ->where('target_finish_date', '>=', $now)
+              ->where('target_finish_date', '<', $startOfNextMonth);
         }, true)['list'];
 
-        $projectOnTrackList = $this->getProjectsByCriteria($now, function($q) use ($now) {
-            $q->whereNotNull('target_finish_date')->where('target_finish_date', '>=', $now);
+        $projectOnTrackList = $this->getProjectsByCriteria($now, function($q) use ($startOfNextMonth) {
+            $q->whereNotNull('target_finish_date')
+              ->where('target_finish_date', '>=', $startOfNextMonth);
         }, true)['list'];
 
         // Top 5 Overdue Projects

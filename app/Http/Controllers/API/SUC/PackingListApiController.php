@@ -4,6 +4,7 @@ namespace App\Http\Controllers\API\SUC;
 
 use App\Http\Controllers\Controller;
 use App\Models\PackingList;
+use App\Models\Project;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
@@ -11,11 +12,63 @@ class PackingListApiController extends Controller
 {
     //
 
-    public function index()
+    public function projectList()
     {
-        // Sorting by numeric part of pl_number (format: PL/XXX/YYYY)
-        $lists = PackingList::with(['project', 'expedition', 'plType', 'intPic', 'creator', 'destination'])
-            ->get()
+        $projects = Project::with(['client', 'quotation.client'])->get()->map(function ($project) {
+            return [
+                'pn_number' => $project->pn_number,
+                'project_number' => $project->project_number,
+                'project_name' => $project->project_name,
+                'client_name' => $project->client->name ?? ($project->quotation->client->name ?? 'N/A'),
+            ];
+        });
+
+        return response()->json($projects);
+    }
+
+    public function index(Request $request)
+    {
+        // Get filter parameters
+        $yearParam = $request->query('year');
+        $rangeType = $request->query('range_type', 'yearly'); // yearly, monthly, custom
+        $monthParam = $request->query('month'); // 1-12
+        $fromDate = $request->query('from_date');
+        $toDate = $request->query('to_date');
+
+        // Get available years from pl_date
+        $availableYears = PackingList::selectRaw('YEAR(pl_date) as year')
+            ->whereNotNull('pl_date')
+            ->distinct()
+            ->pluck('year')
+            ->map(fn($y) => (int)$y)
+            ->sort()
+            ->values()
+            ->toArray();
+
+        $year = $yearParam ? (int)$yearParam : (!empty($availableYears) ? end($availableYears) : now()->year);
+
+        // Build query with eager loading
+        $lists = PackingList::with(['project', 'expedition', 'plType', 'intPic', 'creator', 'destination']);
+
+        // Apply pl_date filter
+        if ($rangeType === 'monthly' && $monthParam) {
+            $month = (int)$monthParam;
+            if ($month >= 1 && $month <= 12) {
+                $lists->whereYear('pl_date', $year)
+                      ->whereMonth('pl_date', $month);
+            }
+        } elseif ($rangeType === 'weekly') {
+            // Filter by current week
+            $lists->whereBetween('pl_date', [now()->startOfWeek(), now()->endOfWeek()]);
+        } elseif ($rangeType === 'custom' && $fromDate && $toDate) {
+            $lists->whereBetween('pl_date', [$fromDate, $toDate]);
+        } else {
+            // default: filter by year only
+            $lists->whereYear('pl_date', $year);
+        }
+
+        // Get results and sort by pl_number
+        $lists = $lists->get()
             ->sortByDesc(function ($item) {
                 if (preg_match('/^PL\/(\d{3})\/(\d{4})$/', $item->pl_number, $matches)) {
                     // parse the numeric part as integer for sorting by largest number
@@ -24,7 +77,17 @@ class PackingListApiController extends Controller
                 return 0;
             })->values(); // reindex collection after sorting
 
-        return response()->json($lists);
+        return response()->json([
+            'data' => $lists,
+            'filters' => [
+                'year' => $year,
+                'range_type' => $rangeType,
+                'month' => $monthParam,
+                'from_date' => $fromDate,
+                'to_date' => $toDate,
+                'available_years' => $availableYears,
+            ],
+        ]);
     }
 
     public function store(Request $request)
@@ -51,6 +114,7 @@ class PackingListApiController extends Controller
             'pl_return_date' => 'nullable|date',
             'remark' => 'nullable|string',
             'pl_number' => 'nullable|string', // allow pl_number to be optionally provided
+            'year' => 'nullable|integer|min:2000|max:2100', // allow custom year for pl_number
         ]);
 
         // If pl_number is provided in request, use that; otherwise generate
@@ -62,8 +126,8 @@ class PackingListApiController extends Controller
                 $numberFormatted = $matches[1];
                 $year = $matches[2];
             } else {
-                // If format incorrect, fall back to generate new number for current year
-                $year = now()->format('Y');
+                // If format incorrect, use custom year or fall back to current year
+                $year = $validated['year'] ?? now()->format('Y');
                 $last = PackingList::whereYear('created_at', $year)
                     ->orderByDesc('created_at')
                     ->first();
@@ -77,8 +141,8 @@ class PackingListApiController extends Controller
                 $pl_number = "PL/{$numberFormatted}/{$year}";
             }
         } else {
-            // auto-generate pl_number and year
-            $year = now()->format('Y');
+            // auto-generate pl_number - use custom year if provided, otherwise current year
+            $year = $validated['year'] ?? now()->format('Y');
             $last = PackingList::whereYear('created_at', $year)
                 ->orderByDesc('created_at')
                 ->first();
@@ -130,7 +194,6 @@ class PackingListApiController extends Controller
             'receive_date' => 'nullable|date',
             'pl_return_date' => 'nullable|date',
             'remark' => 'nullable|string',
-            'pl_number' => 'nullable|string', // allow updating pl_number
         ]);
 
         // Cast foreign key fields to integers to prevent SQL Server conversion errors
@@ -140,19 +203,7 @@ class PackingListApiController extends Controller
         $validated['pl_type_id'] = isset($validated['pl_type_id']) ? (int) $validated['pl_type_id'] : null;
         $validated['int_pic'] = isset($validated['int_pic']) ? (int) $validated['int_pic'] : null;
 
-        // If pl_number is given, parse it to generate corresponding pl_id
-        if (!empty($validated['pl_number'])) {
-            $pl_number = $validated['pl_number'];
 
-            if (preg_match('/^PL\/(\d{3})\/(\d{4})$/', $pl_number, $matches)) {
-                $numberFormatted = $matches[1];
-                $year = $matches[2];
-                $validated['pl_id'] = $numberFormatted . $year;
-            } else {
-                // Invalid format, remove pl_number to avoid saving bad data
-                unset($validated['pl_number']);
-            }
-        }
 
         $packingList->update($validated);
 
@@ -174,9 +225,9 @@ class PackingListApiController extends Controller
         ]);
     }
 
-    public function generateNumber()
+    public function generateNumber(Request $request)
     {
-        $year = now()->format('Y');
+        $year = $request->input('year', now()->format('Y'));
 
         $last = PackingList::whereYear('created_at', $year)
             ->orderByDesc('created_at')

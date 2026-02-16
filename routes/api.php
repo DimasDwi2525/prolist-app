@@ -172,6 +172,7 @@ Route::middleware('auth:api')->group(function () {
     Route::delete('/status-projects/{statusProject}', [MarketingStatusProjectController::class, 'destroy']);
 
     Route::get('/sales-report', [SalesReportApiController::class, 'index']);
+    Route::get('/sales-report/pdf', [SalesReportApiController::class, 'downloadPdf']);
     Route::get('/marketing-report', [MarketingReportApiController::class, 'index']);
 
     Route::get('/projects/generate-number', [MarketingProjectController::class, 'generateNumber']);
@@ -182,6 +183,7 @@ Route::middleware('auth:api')->group(function () {
     Route::delete('/projects/{project}', [MarketingProjectController::class, 'destroy']);
 
     Route::post('/phc', [MarketingPhcApiController::class, 'store']);
+    Route::post('/phc/{id}/delegate-ho-engineering', [MarketingPhcApiController::class, 'delegateHoEngineering']);
 
     Route::get('/notifications', [NotificationController::class, 'index']);
     Route::get('/notifications/all', [NotificationController::class, 'all']);
@@ -303,6 +305,7 @@ Route::middleware('auth:api')->group(function () {
     Route::delete('man-power/{id}', [ManPowerAllocationApiController::class, 'destroy']);
 
     Route::get('/packing-lists/generate-number', [PackingListApiController::class, 'generateNumber']);
+    Route::get('/packing-lists/project-list', [PackingListApiController::class, 'projectList']);
     Route::get('/packing-lists', [PackingListApiController::class, 'index']);
 
     Route::post('/packing-lists', [PackingListApiController::class, 'store']);

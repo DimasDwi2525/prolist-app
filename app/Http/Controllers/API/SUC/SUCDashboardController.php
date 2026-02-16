@@ -42,10 +42,12 @@ class SUCDashboardController extends Controller
             ->orderBy('target_date', 'asc')
             ->get();
 
-        // PL Outstanding
-        $plQuery = PackingList::with(['project', 'expedition', 'plType', 'intPic', 'creator', 'destination']);
+        // PL Outstanding - only type 1 & 5 that haven't been returned yet
+        $plQuery = PackingList::with(['project', 'expedition', 'plType', 'intPic', 'creator', 'destination'])
+            ->whereIn('pl_type_id', [1, 5])
+            ->whereNull('pl_return_date');
 
-        // Optional filter by pl_type_id
+        // Optional filter by pl_type_id (overrides default filter)
         if ($request->has('pl_type_id') && $request->pl_type_id) {
             $plQuery->where('pl_type_id', $request->pl_type_id);
         }

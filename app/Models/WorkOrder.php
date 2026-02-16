@@ -48,8 +48,8 @@ class WorkOrder extends Model
         'add_work'                => 'boolean',
         'client_approved'         => 'boolean',
         'wo_date'                 => 'datetime',
-        'start_work_time'         => 'datetime',
-        'stop_work_time'          => 'datetime',
+        'start_work_time'         => 'datetime:H:i',
+        'stop_work_time'          => 'datetime:H:i',
         'continue_date'           => 'date',
         'continue_time'           => 'datetime:H:i', // cast ke jam saja
         'scheduled_start_working_date' => 'date',

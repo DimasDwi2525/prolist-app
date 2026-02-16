@@ -40,6 +40,7 @@ class PhcApprovalUpdated implements ShouldBroadcastNow
         return [
             'phc_id' => $this->phc->id,
             'status' => $this->phc->status,
+            'user_ids' => $this->userIds,
             'message' => "PHC approval for project {$projectNumber} has been updated.",
             'created_at' => now()->toISOString(),
             'title' => 'PHC Approval Updated',
