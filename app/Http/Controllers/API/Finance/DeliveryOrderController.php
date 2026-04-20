@@ -31,7 +31,7 @@ class DeliveryOrderController extends Controller
             'do_description' => 'nullable|string',
             'pn_id' => 'required|integer|exists:projects,pn_number',
             'return_date' => 'nullable|date',
-            'invoice_id' => 'nullable|integer|exists:invoices,id',
+            'invoice_id' => 'nullable|string|exists:invoices,invoice_id',
             'do_send' => 'nullable|date',
         ]);
 
@@ -82,7 +82,7 @@ class DeliveryOrderController extends Controller
             'do_description' => 'nullable|string',
             'pn_id' => 'sometimes|required|integer|exists:projects,pn_number',
             'return_date' => 'nullable|date',
-            'invoice_id' => 'nullable|integer|exists:invoices,id',
+            'invoice_id' => 'nullable|string|exists:invoices,invoice_id',
             'do_send' => 'nullable|date',
         ]);
 

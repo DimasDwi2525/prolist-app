@@ -380,9 +380,9 @@ Route::middleware('auth:api')->group(function () {
         Route::get('invoice-summary', [\App\Http\Controllers\API\Finance\InvoiceController::class, 'invoiceSummary']);
         Route::get('invoices/validate', [\App\Http\Controllers\API\Finance\InvoiceController::class, 'validateInvoice']);
         Route::get('invoices/preview-taxes', [\App\Http\Controllers\API\Finance\InvoiceController::class, 'previewTaxes']);
-        Route::get('invoices/{id}', [\App\Http\Controllers\API\Finance\InvoiceController::class, 'show']);
-        Route::put('invoices/{id}', [\App\Http\Controllers\API\Finance\InvoiceController::class, 'update']);
-        Route::delete('invoices/{id}', [\App\Http\Controllers\API\Finance\InvoiceController::class, 'destroy']);
+        Route::get('invoices/{id}', [\App\Http\Controllers\API\Finance\InvoiceController::class, 'show'])->where('id', '.*');
+        Route::put('invoices/{id}', [\App\Http\Controllers\API\Finance\InvoiceController::class, 'update'])->where('id', '.*');
+        Route::delete('invoices/{id}', [\App\Http\Controllers\API\Finance\InvoiceController::class, 'destroy'])->where('id', '.*');
 
 
         Route::get('invoice-payments', [InvoicePaymentController::class, 'index']);

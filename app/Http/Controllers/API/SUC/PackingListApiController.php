@@ -3,10 +3,10 @@
 namespace App\Http\Controllers\API\SUC;
 
 use App\Http\Controllers\Controller;
+use App\Models\DeliveryOrder;
 use App\Models\PackingList;
 use App\Models\Project;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
 
 class PackingListApiController extends Controller
 {
@@ -164,6 +164,7 @@ class PackingListApiController extends Controller
         $validated['created_by'] = auth()->id();
 
         $packingList = PackingList::create($validated);
+        $this->createFinanceDeliveryOrder($packingList);
 
         return response()->json([
             'success' => true,
@@ -196,16 +197,15 @@ class PackingListApiController extends Controller
             'remark' => 'nullable|string',
         ]);
 
-        // Cast foreign key fields to integers to prevent SQL Server conversion errors
-        $validated['pn_id'] = isset($validated['pn_id']) ? (int) $validated['pn_id'] : null;
-        $validated['destination_id'] = isset($validated['destination_id']) ? (int) $validated['destination_id'] : null;
-        $validated['expedition_id'] = isset($validated['expedition_id']) ? (int) $validated['expedition_id'] : null;
-        $validated['pl_type_id'] = isset($validated['pl_type_id']) ? (int) $validated['pl_type_id'] : null;
-        $validated['int_pic'] = isset($validated['int_pic']) ? (int) $validated['int_pic'] : null;
-
-
+        // Cast only submitted foreign key fields to prevent SQL Server conversion errors.
+        foreach (['pn_id', 'destination_id', 'expedition_id', 'pl_type_id', 'int_pic'] as $field) {
+            if (array_key_exists($field, $validated) && $validated[$field] !== null) {
+                $validated[$field] = (int) $validated[$field];
+            }
+        }
 
         $packingList->update($validated);
+        $this->createFinanceDeliveryOrder($packingList->fresh('plType'));
 
         return response()->json([
             'success' => true,
@@ -263,7 +263,6 @@ class PackingListApiController extends Controller
             'destination'
         ])->findOrFail($id);
 
-        // Check if packing list type is Finance
         $plType = $packingList->plType;
         if (!$plType || $plType->name !== 'Finance') {
             return response()->json([
@@ -272,54 +271,50 @@ class PackingListApiController extends Controller
             ], 400);
         }
 
-        // Check if ship_date is set
-        if (!$packingList->ship_date) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Shipment date must be set to create delivery order'
-            ], 400);
+        $deliveryOrder = $this->createFinanceDeliveryOrder($packingList);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Delivery order created successfully',
+            'data' => $deliveryOrder,
+        ]);
+    }
+
+    private function createFinanceDeliveryOrder(PackingList $packingList): ?DeliveryOrder
+    {
+        $packingList->loadMissing('plType');
+
+        if (!$packingList->plType || $packingList->plType->name !== 'Finance') {
+            return null;
         }
 
-        // Check if delivery order already exists
-        $existingDO = \App\Models\DeliveryOrder::where('pn_id', $packingList->pn_id)
-            ->where('do_description', 'Packing List Type Finance')
+        $description = 'Packing List Type Finance';
+
+        $existingDeliveryOrder = DeliveryOrder::where('pn_id', $packingList->pn_id)
+            ->where('do_description', $description)
             ->first();
 
-        if ($existingDO) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Delivery order already exists for this packing list'
-            ], 400);
+        if ($existingDeliveryOrder) {
+            return $existingDeliveryOrder;
         }
 
-        // Generate do_number and do_no for delivery order
-        $year = date('y'); // e.g., '25'
+        $year = date('y');
         $prefix = 'SP' . $year;
         $doPrefix = 'SP/' . $year . '/';
 
-        // Find the max number for the current year
-        $maxDoNumber = \App\Models\DeliveryOrder::where('do_number', 'like', $prefix . '%')
+        $maxDoNumber = DeliveryOrder::where('do_number', 'like', $prefix . '%')
             ->selectRaw('MAX(CAST(SUBSTRING(do_number, LEN(?) + 1, LEN(do_number)) AS INT)) as max_num', [$prefix])
             ->value('max_num') ?? 0;
 
         $nextNum = $maxDoNumber + 1;
         $paddedNum = str_pad($nextNum, 3, '0', STR_PAD_LEFT);
 
-        $doNumber = $prefix . $paddedNum;
-        $doNo = $doPrefix . $paddedNum;
-
-        $deliveryOrder = \App\Models\DeliveryOrder::create([
-            'do_number' => $doNumber,
-            'do_no' => $doNo,
-            'do_description' => 'Packing List Type Finance',
+        return DeliveryOrder::create([
+            'do_number' => $prefix . $paddedNum,
+            'do_no' => $doPrefix . $paddedNum,
+            'do_description' => $description,
             'pn_id' => $packingList->pn_id,
-            'do_send' => $packingList->ship_date, // Set do_send to ship_date
-        ]);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Delivery order created successfully',
-            'data' => $deliveryOrder,
+            'do_send' => $packingList->ship_date,
         ]);
     }
 

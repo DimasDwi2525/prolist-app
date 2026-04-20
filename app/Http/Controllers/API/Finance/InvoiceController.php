@@ -13,6 +13,8 @@ use App\Models\Tax;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\Rule;
 
 class InvoiceController extends Controller
 {
@@ -154,6 +156,14 @@ class InvoiceController extends Controller
             'is_ppn' => 'nullable|boolean',
             'is_pph23' => 'nullable|boolean',
             'is_pph42' => 'nullable|boolean',
+            'invoice_id' => [
+                'sometimes',
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('invoices', 'invoice_id')->ignore($invoice->invoice_id, 'invoice_id'),
+            ],
+            'invoice_number_in_project' => 'sometimes|required|integer|min:1',
             'nilai_ppn' => 'nullable|numeric',
             'nilai_pph23' => 'nullable|numeric',
             'nilai_pph42' => 'nullable|numeric',
@@ -183,40 +193,34 @@ class InvoiceController extends Controller
             return response()->json(['error' => 'Invoice total exceeds project value'], 400);
         }
 
-        $data = $request->all();
+        $data = $request->except('invoice_id');
+        $newInvoiceId = $request->input('invoice_id');
 
-        // Handle invoice_type_id change: regenerate invoice_id based on new type, keep sequence number
-        if ($request->has('invoice_type_id') && $request->invoice_type_id != $invoice->invoice_type_id) {
-            $oldInvoiceId = $invoice->invoice_id;
-            $sequence = substr($oldInvoiceId, -4); // Extract last 4 characters as sequence (e.g., '0001')
+        // If invoice_id is not edited manually, keep the old behavior:
+        // changing invoice_type_id regenerates the invoice_id with the old sequence.
+        if (!$newInvoiceId && $request->has('invoice_type_id') && $request->invoice_type_id != $invoice->invoice_type_id) {
+            $sequence = substr($invoice->invoice_id, -4); // e.g. '0001'
+            $year = date('y');
 
-            $year = date('y'); // Current year short
-
-            $newCodeType = '00'; // default
             $newInvoiceType = InvoiceType::find($request->invoice_type_id);
-            if ($newInvoiceType) {
-                $newCodeType = $newInvoiceType->code_type;
+            $newCodeType = $newInvoiceType ? $newInvoiceType->code_type : '00';
+            $newInvoiceId = $newCodeType . '/' . $year . '/' . $sequence;
+
+            if (Invoice::where('invoice_id', $newInvoiceId)->where('invoice_id', '!=', $invoice->invoice_id)->exists()) {
+                return response()->json(['error' => 'Invoice ID already exists'], 400);
             }
-
-            $newInvoiceId = $newCodeType . '/' . $year . '/' . $sequence; // e.g., 'IP/25/0001'
-
-            DB::transaction(function () use ($oldInvoiceId, $newInvoiceId) {
-                // Update all payments to reference the new invoice_id
-                InvoicePayment::where('invoice_id', $oldInvoiceId)->update(['invoice_id' => $newInvoiceId]);
-                // Update the invoice's invoice_id using raw SQL since it's the primary key
-                DB::statement("UPDATE invoices SET invoice_id = ? WHERE invoice_id = ?", [$newInvoiceId, $oldInvoiceId]);
-            });
-
-            // Reload the invoice with the new ID
-            $invoice = Invoice::find($newInvoiceId);
-            // Remove invoice_type_id from data since it's already updated
-            unset($data['invoice_type_id']);
         }
 
-        // Remove invoice_id from data to prevent manual updating
-        unset($data['invoice_id']);
+        $invoice = DB::transaction(function () use ($invoice, $data, $newInvoiceId) {
+            if ($newInvoiceId && $newInvoiceId !== $invoice->invoice_id) {
+                $this->changeInvoiceId($invoice->invoice_id, $newInvoiceId);
+                $invoice = Invoice::findOrFail($newInvoiceId);
+            }
 
-        $invoice->update($data);
+            $invoice->update($data);
+
+            return $invoice->fresh(['project', 'invoiceType', 'payments']);
+        });
 
         // Calculate taxes and totals
         $this->calculateInvoiceTaxesAndTotals($invoice);
@@ -235,6 +239,45 @@ class InvoiceController extends Controller
         }
 
         return response()->json($invoice);
+    }
+
+    private function changeInvoiceId(string $oldInvoiceId, string $newInvoiceId): void
+    {
+        Schema::disableForeignKeyConstraints();
+
+        try {
+            DB::table('invoices')
+                ->where('invoice_id', $oldInvoiceId)
+                ->update(['invoice_id' => $newInvoiceId]);
+
+            $this->updateInvoiceReference('invoice_payments', 'invoice_id', $oldInvoiceId, $newInvoiceId);
+            $this->updateInvoiceReference('holding_taxes', 'invoice_id', $oldInvoiceId, $newInvoiceId);
+            $this->updateInvoiceReference('retentions', 'invoice_id', $oldInvoiceId, $newInvoiceId);
+            $this->updateDeliveryOrderInvoiceReference($oldInvoiceId, $newInvoiceId);
+        } finally {
+            Schema::enableForeignKeyConstraints();
+        }
+    }
+
+    private function updateInvoiceReference(string $table, string $column, string $oldInvoiceId, string $newInvoiceId): void
+    {
+        if (!Schema::hasTable($table) || !Schema::hasColumn($table, $column)) {
+            return;
+        }
+
+        DB::table($table)
+            ->where($column, $oldInvoiceId)
+            ->update([$column => $newInvoiceId]);
+    }
+
+    private function updateDeliveryOrderInvoiceReference(string $oldInvoiceId, string $newInvoiceId): void
+    {
+        if (!Schema::hasTable('delivery_orders')) {
+            return;
+        }
+
+        $this->updateInvoiceReference('delivery_orders', 'invoice_id', $oldInvoiceId, $newInvoiceId);
+        $this->updateInvoiceReference('delivery_orders', 'invoice_no', $oldInvoiceId, $newInvoiceId);
     }
 
     /**
