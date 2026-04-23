@@ -28,11 +28,20 @@ class InvoiceController extends Controller
             return response()->json(['error' => 'project_id is required'], 400);
         }
 
-        $invoices = Invoice::where('project_id', $projectId)
+        $invoiceQuery = Invoice::where('project_id', $projectId)
             ->with(['project', 'invoiceType', 'payments'])
-            ->orderBy('invoice_number_in_project', 'asc')
-            ->get()
-            ->map(function ($invoice) use ($projectId) {
+            ->orderBy('invoice_number_in_project', 'asc');
+
+        $summaryInvoices = (clone $invoiceQuery)->get();
+        $totalPayment = $summaryInvoices->sum(function ($invoice) {
+            return $invoice->payments->sum('payment_amount');
+        });
+        $totalInvoiceValue = $summaryInvoices->sum('invoice_value');
+        $outstandingPayment = $totalInvoiceValue - $totalPayment;
+
+        $invoices = $invoiceQuery
+            ->paginate(5)
+            ->through(function ($invoice) use ($projectId) {
                 $invoice->total_payment_amount = $invoice->payments->sum('payment_amount');
 
                 // Calculate remaining project value
@@ -43,10 +52,6 @@ class InvoiceController extends Controller
                 $invoice->remaining_project_value = $remainingProjectValue;
                 return $invoice;
             });
-
-        $totalPayment = $invoices->sum('total_payment_amount');
-        $totalInvoiceValue = $invoices->sum('invoice_value');
-        $outstandingPayment = $totalInvoiceValue - $totalPayment;
 
         return response()->json([
             'invoices' => $invoices,
@@ -129,7 +134,11 @@ class InvoiceController extends Controller
      */
     public function show(string $id): JsonResponse
     {
-        $invoice = Invoice::with(['project', 'invoiceType', 'payments'])->findOrFail($id);
+        $id = $this->normalizeInvoiceId($id);
+
+        $invoice = Invoice::with(['project', 'invoiceType', 'payments'])
+            ->where('invoice_id', $id)
+            ->firstOrFail();
         $invoice->total_payment_amount = $invoice->payments->sum('payment_amount');
         return response()->json($invoice);
     }
@@ -139,7 +148,9 @@ class InvoiceController extends Controller
      */
     public function update(Request $request, string $id): JsonResponse
     {
-        $invoice = Invoice::findOrFail($id);
+        $id = $this->normalizeInvoiceId($id);
+
+        $invoice = Invoice::where('invoice_id', $id)->firstOrFail();
 
         $request->validate([
             'project_id' => 'sometimes|required|string',
@@ -230,9 +241,10 @@ class InvoiceController extends Controller
 
         // Update payment_status based on payments
         $totalPaid = $invoice->payments()->sum('payment_amount');
+        $paymentTarget = $invoice->total_invoice ?? $invoice->invoice_value;
         if ($totalPaid == 0) {
             $invoice->update(['payment_status' => 'unpaid']);
-        } elseif ($totalPaid < $invoice->total_invoice ?? $invoice->invoice_value) {
+        } elseif ($totalPaid < $paymentTarget) {
             $invoice->update(['payment_status' => 'partial']);
         } else {
             $invoice->update(['payment_status' => 'paid']);
@@ -285,6 +297,8 @@ class InvoiceController extends Controller
      */
     public function destroy(string $id): JsonResponse
     {
+        $id = $this->normalizeInvoiceId($id);
+
         $invoice = Invoice::where('invoice_id', $id)->firstOrFail();
 
         DB::transaction(function () use ($invoice) {
@@ -302,6 +316,11 @@ class InvoiceController extends Controller
         });
 
         return response()->json(['message' => 'Invoice deleted successfully']);
+    }
+
+    private function normalizeInvoiceId(string $id): string
+    {
+        return rawurldecode($id);
     }
 
     /**
@@ -467,13 +486,17 @@ class InvoiceController extends Controller
         $pph23Rate = 0;
         $pph42Rate = 0;
 
-        if ($invoice->is_ppn) {
+        $isPpn = $this->toBoolean($invoice->is_ppn);
+        $isPph23 = $this->toBoolean($invoice->is_pph23);
+        $isPph42 = $this->toBoolean($invoice->is_pph42);
+
+        if ($isPpn) {
             $ppnRate = optional($taxes['PPN'])->rate ?? 0.11;
         }
-        if ($invoice->is_pph23) {
+        if ($isPph23) {
             $pph23Rate = optional($taxes['PPh 23'])->rate ?? 0.0265;
         }
-        if ($invoice->is_pph42) {
+        if ($isPph42) {
             $pph42Rate = optional($taxes['PPh 4(2)'])->rate ?? 0.02;
         }
 
@@ -485,14 +508,11 @@ class InvoiceController extends Controller
         }
 
         // Use manual values if provided, otherwise calculate automatically
-        $nilaiPpn = $invoice->nilai_ppn ?? ($invoiceValue * $ppnRate);
-        $nilaiPph23 = $invoice->nilai_pph23 ?? ($invoiceValue * $pph23Rate);
-        $nilaiPph42 = $invoice->nilai_pph42 ?? ($invoiceValue * $pph42Rate);
+        $nilaiPpn = $isPpn ? ($invoice->nilai_ppn ?? ($invoiceValue * $ppnRate)) : 0;
+        $nilaiPph23 = $isPph23 ? ($invoice->nilai_pph23 ?? ($invoiceValue * $pph23Rate)) : 0;
+        $nilaiPph42 = $isPph42 ? ($invoice->nilai_pph42 ?? ($invoiceValue * $pph42Rate)) : 0;
 
-        $totalInvoice = $invoiceValue;
-        if ($invoice->is_ppn) {
-            $totalInvoice += $nilaiPpn;
-        }
+        $totalInvoice = $this->calculateTotalInvoice($invoiceValue, $nilaiPpn);
 
         $expectedPayment = $totalInvoice - $nilaiPph23 - $nilaiPph42;
 
@@ -506,6 +526,16 @@ class InvoiceController extends Controller
             'total_invoice' => $totalInvoice,
             'expected_payment' => $expectedPayment,
         ]);
+    }
+
+    private function calculateTotalInvoice(float $invoiceValue, float $nilaiPpn): float
+    {
+        return $invoiceValue + $nilaiPpn;
+    }
+
+    private function toBoolean(mixed $value): bool
+    {
+        return filter_var($value, FILTER_VALIDATE_BOOLEAN);
     }
 
     /**
@@ -690,13 +720,17 @@ class InvoiceController extends Controller
         $pph23Rate = 0;
         $pph42Rate = 0;
 
-        if ($request->boolean('is_ppn')) {
+        $isPpn = $request->boolean('is_ppn');
+        $isPph23 = $request->boolean('is_pph23');
+        $isPph42 = $request->boolean('is_pph42');
+
+        if ($isPpn) {
             $ppnRate = optional($taxes['PPN'])->rate ?? 0.11;
         }
-        if ($request->boolean('is_pph23')) {
+        if ($isPph23) {
             $pph23Rate = optional($taxes['PPh 23'])->rate ?? 0.0265;
         }
-        if ($request->boolean('is_pph42')) {
+        if ($isPph42) {
             $pph42Rate = optional($taxes['PPh 4(2)'])->rate ?? 0.02;
         }
 
@@ -707,14 +741,11 @@ class InvoiceController extends Controller
             $invoiceValue *= $request->rate_usd;
         }
 
-        $nilaiPpn = $invoiceValue * $ppnRate;
-        $nilaiPph23 = $invoiceValue * $pph23Rate;
-        $nilaiPph42 = $invoiceValue * $pph42Rate;
+        $nilaiPpn = $isPpn ? ($invoiceValue * $ppnRate) : 0;
+        $nilaiPph23 = $isPph23 ? ($invoiceValue * $pph23Rate) : 0;
+        $nilaiPph42 = $isPph42 ? ($invoiceValue * $pph42Rate) : 0;
 
-        $totalInvoice = $invoiceValue;
-        if ($request->is_ppn) {
-            $totalInvoice += $nilaiPpn;
-        }
+        $totalInvoice = $this->calculateTotalInvoice($invoiceValue, $nilaiPpn);
 
         $expectedPayment = $totalInvoice - $nilaiPph23 - $nilaiPph42;
 

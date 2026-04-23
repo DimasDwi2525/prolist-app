@@ -35,6 +35,7 @@ class PHC extends Model
         'pic_marketing_id',
         'costing_by_marketing',
         'boq',
+        'boq_file_path',
         'retention',
         'warranty',
         'penalty',

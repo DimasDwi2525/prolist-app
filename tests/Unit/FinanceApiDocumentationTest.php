@@ -86,6 +86,16 @@ class FinanceApiDocumentationTest extends TestCase
         $this->assertSame('IP/26/0001', $route->parameter('id'));
     }
 
+    #[DataProvider('invoiceRoutesWithSlashProvider')]
+    public function test_invoice_routes_allow_encoded_slashes_in_last_parameter(string $method): void
+    {
+        $request = request()->create('/api/finance/invoices/IP%2F26%2F0001', $method);
+        $route = Route::getRoutes()->match($request);
+
+        $this->assertSame('api/finance/invoices/{id}', $route->uri());
+        $this->assertSame('IP/26/0001', rawurldecode($route->parameter('id')));
+    }
+
     public static function invoiceRoutesWithSlashProvider(): array
     {
         return [

@@ -33,6 +33,8 @@ use App\Http\Controllers\API\Marketing\MarketingStatusProjectController;
 use App\Http\Controllers\API\Marketing\SalesReportApiController;
 use App\Http\Controllers\API\NotificationController;
 use App\Http\Controllers\API\ProfileApiController;
+use App\Http\Controllers\API\ProjectEngineeringController;
+use App\Http\Controllers\API\ProjectProgressReportController;
 use App\Http\Controllers\API\SUC\MaterialRequestApiController;
 use App\Http\Controllers\API\SUC\PackingListApiController;
 use App\Http\Controllers\API\SUC\SUCDashboardController;
@@ -175,7 +177,9 @@ Route::middleware('auth:api')->group(function () {
     Route::get('/sales-report/pdf', [SalesReportApiController::class, 'downloadPdf']);
     Route::get('/marketing-report', [MarketingReportApiController::class, 'index']);
 
+    Route::get('/project-engineering', [ProjectEngineeringController::class, 'index']);
     Route::get('/projects/generate-number', [MarketingProjectController::class, 'generateNumber']);
+    Route::get('/projects/progress-report', [ProjectProgressReportController::class, 'index']);
     
     Route::post('/projects', [MarketingProjectController::class, 'store']);
     
@@ -184,6 +188,8 @@ Route::middleware('auth:api')->group(function () {
 
     Route::post('/phc', [MarketingPhcApiController::class, 'store']);
     Route::post('/phc/{id}/delegate-ho-engineering', [MarketingPhcApiController::class, 'delegateHoEngineering']);
+    Route::get('/phc/{id}/boq-file', [MarketingPhcApiController::class, 'viewBoqFile']);
+    Route::post('/phc/{id}', [MarketingPhcApiController::class, 'update']);
 
     Route::get('/notifications', [NotificationController::class, 'index']);
     Route::get('/notifications/all', [NotificationController::class, 'all']);
@@ -309,6 +315,7 @@ Route::middleware('auth:api')->group(function () {
     Route::get('/packing-lists', [PackingListApiController::class, 'index']);
 
     Route::post('/packing-lists', [PackingListApiController::class, 'store']);
+    Route::get('/packing-lists/by-pn/{pn_number}', [PackingListApiController::class, 'showByPnNumber']);
     Route::get('/packing-lists/{id}', [PackingListApiController::class, 'show']);
     Route::put('/packing-lists/{id}', [PackingListApiController::class, 'update']);
     Route::delete('/packing-lists/{id}', [PackingListApiController::class, 'destroy']);

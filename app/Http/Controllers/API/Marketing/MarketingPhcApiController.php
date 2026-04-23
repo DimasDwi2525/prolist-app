@@ -12,6 +12,7 @@ use App\Models\Retention;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
 
 class MarketingPhcApiController extends Controller
 {
@@ -40,6 +41,7 @@ class MarketingPhcApiController extends Controller
             'retention_months' => 'nullable|integer|min:0',
             'warranty_date' => 'nullable|date',
             'penalty' => 'nullable',
+            'boq_file_path' => 'nullable|file|max:10240',
         ]);
 
         $mapRadio = function ($value) {
@@ -51,6 +53,7 @@ class MarketingPhcApiController extends Controller
         $validated['retention'] = $request->boolean('retention');
         $validated['warranty'] = $request->boolean('warranty');
         $validated['penalty'] = $request->penalty;
+        $validated['boq_file_path'] = $this->storeBoqFile($request);
 
         $validated['created_by'] = Auth::id();
         // waiting approval (stored as `pending` for DB compatibility)
@@ -184,6 +187,33 @@ class MarketingPhcApiController extends Controller
         ]);
     }
 
+    public function viewBoqFile($id)
+    {
+        $phc = PHC::find($id);
+
+        if (!$phc) {
+            return response()->json([
+                'success' => false,
+                'message' => 'PHC tidak ditemukan'
+            ], 404);
+        }
+
+        if (!$phc->boq_file_path || !Storage::disk('public')->exists($phc->boq_file_path)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'File BOQ tidak ditemukan'
+            ], 404);
+        }
+
+        $filePath = Storage::disk('public')->path($phc->boq_file_path);
+        $mimeType = $this->boqFileMimeType($filePath);
+
+        return response()->file($filePath, [
+            'Content-Type' => $mimeType,
+            'Content-Disposition' => 'inline; filename="' . basename($phc->boq_file_path) . '"',
+        ]);
+    }
+
     public function update(Request $request, $id)
     {
         $phc = PHC::find($id);
@@ -218,6 +248,7 @@ class MarketingPhcApiController extends Controller
             'penalty' => 'nullable|string',
             'boq' => 'nullable|string',
             'costing_by_marketing' => 'nullable|string',
+            'boq_file_path' => 'nullable|file|max:10240',
         ]);
 
         // Mapping radio
@@ -226,6 +257,10 @@ class MarketingPhcApiController extends Controller
             if (isset($validated[$field])) {
                 $validated[$field] = $mapRadio($validated[$field]);
             }
+        }
+
+        if ($this->hasBoqFile($request)) {
+            $validated['boq_file_path'] = $this->replaceBoqFile($request, $phc);
         }
 
          $phc->update($validated);
@@ -311,6 +346,54 @@ class MarketingPhcApiController extends Controller
             'message' => 'PHC berhasil diperbarui',
             'data' => $phc
         ]);
+    }
+
+    private function storeBoqFile(Request $request): ?string
+    {
+        if (!$this->hasBoqFile($request)) {
+            return null;
+        }
+
+        return $this->boqFile($request)->store('phc_boq_files', 'public');
+    }
+
+    private function replaceBoqFile(Request $request, PHC $phc): string
+    {
+        if ($phc->boq_file_path && Storage::disk('public')->exists($phc->boq_file_path)) {
+            Storage::disk('public')->delete($phc->boq_file_path);
+        }
+
+        return $this->boqFile($request)->store('phc_boq_files', 'public');
+    }
+
+    private function hasBoqFile(Request $request): bool
+    {
+        return $request->hasFile('boq_file_path') || $request->hasFile('boq_file');
+    }
+
+    private function boqFile(Request $request): \Illuminate\Http\UploadedFile
+    {
+        return $request->file('boq_file_path') ?? $request->file('boq_file');
+    }
+
+    private function boqFileMimeType(string $filePath): string
+    {
+        $mimeType = mime_content_type($filePath) ?: null;
+
+        if ($mimeType && $mimeType !== 'application/x-empty') {
+            return $mimeType;
+        }
+
+        return match (strtolower(pathinfo($filePath, PATHINFO_EXTENSION))) {
+            'pdf' => 'application/pdf',
+            'xls' => 'application/vnd.ms-excel',
+            'xlsx' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'doc' => 'application/msword',
+            'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'jpg', 'jpeg' => 'image/jpeg',
+            'png' => 'image/png',
+            default => $mimeType ?: 'application/octet-stream',
+        };
     }
 
     public function delegateHoEngineering(Request $request, $id)

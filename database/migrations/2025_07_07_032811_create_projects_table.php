@@ -17,7 +17,7 @@ return new class extends Migration {
             $table->foreignId('categories_project_id')
                 ->constrained('project_categories');
             $table->string('quotations_id');
-            $table->foreign('quotation_number')
+            $table->foreign('quotations_id')
                 ->references('quotation_number')
                 ->on('quotations')
                 ->onDelete('cascade');

@@ -179,6 +179,22 @@ class PackingListApiController extends Controller
         return response()->json($packingList);
     }
 
+    public function showByPnNumber($pn_number)
+    {
+        $project = Project::where('pn_number', $pn_number)->firstOrFail();
+
+        $packingLists = PackingList::with(['project', 'expedition', 'plType', 'intPic', 'creator', 'destination'])
+            ->where('pn_id', $project->pn_number)
+            ->orderByDesc('pl_date')
+            ->orderByDesc('created_at')
+            ->paginate(5);
+
+        return response()->json([
+            'project' => $project,
+            'data' => $packingLists,
+        ]);
+    }
+
     public function update(Request $request, $id)
     {
         $packingList = PackingList::findOrFail($id);

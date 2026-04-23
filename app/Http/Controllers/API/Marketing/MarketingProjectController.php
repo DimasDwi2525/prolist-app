@@ -15,6 +15,7 @@ class MarketingProjectController extends Controller
 
     public function index(Request $request)
     {
+        $perPage = $this->getPerPage($request);
         $yearParam = $request->query('year');
         $availableYears = $this->getAvailableYears();
         $year = $yearParam ? (int)$yearParam : (!empty($availableYears) ? end($availableYears) : now()->year);
@@ -31,9 +32,43 @@ class MarketingProjectController extends Controller
         $targetDateFrom = $request->query('target_date_from');
         $targetDateTo = $request->query('target_date_to');
 
-
         // Inisialisasi query dengan eager loading
-        $projects = Project::with(['category', 'quotation.client', 'client', 'statusProject', 'phc']);
+        $projects = Project::query()
+            ->select([
+                'projects.pn_number',
+                'projects.project_name',
+                'projects.project_number',
+                'projects.categories_project_id',
+                'projects.quotations_id',
+                'projects.phc_dates',
+                'projects.mandays_engineer',
+                'projects.mandays_technician',
+                'projects.target_dates',
+                'projects.material_status',
+                'projects.dokumen_finish_date',
+                'projects.engineering_finish_date',
+                'projects.jumlah_invoice',
+                'projects.status_project_id',
+                'projects.project_progress',
+                'projects.po_date',
+                'projects.sales_weeks',
+                'projects.po_number',
+                'projects.po_value',
+                'projects.is_confirmation_order',
+                'projects.parent_pn_number',
+                'projects.client_id',
+                'projects.project_finish_date',
+                'projects.created_at',
+                'projects.updated_at',
+            ])
+            ->with([
+                'category:id,name',
+                'quotation:quotation_number,client_id',
+                'quotation.client:id,name',
+                'client:id,name',
+                'statusProject:id,name',
+                'phc:id,project_id,status,target_finish_date',
+            ]);
 
         // Apply PO Date Filter (Always applied)
         if ($rangeType === 'monthly' && $monthParam) {
@@ -97,25 +132,31 @@ class MarketingProjectController extends Controller
             }
         }
 
-        
+        $this->applyProjectFilters($projects, $request);
 
         // Execute query with ordering
         $projects = $projects
-            ->select('projects.*') // Important: select all project columns to avoid conflicts with join
-            ->orderByRaw('CAST(LEFT(CAST(pn_number AS VARCHAR), 2) AS INT) DESC')
-            ->orderByRaw('CAST(SUBSTRING(CAST(pn_number AS VARCHAR), 3, LEN(CAST(pn_number AS VARCHAR)) - 2) AS INT) DESC')
-            ->get();
+            ->orderByDesc('projects.pn_number')
+            ->paginate($perPage)
+            ->withQueryString();
 
         return response()->json([
             'status'  => 'success',
             'message' => 'Projects fetched successfully',
-            'data'    => $projects,
+            'data'    => $projects->items(),
+            'meta' => $this->paginationMeta($projects),
             'filters' => [
+                'search' => $request->query('search'),
                 'year' => $year,
                 'range_type' => $rangeType,
                 'month' => $monthParam,
                 'from_date' => $fromDate,
                 'to_date' => $toDate,
+                'category_id' => $request->query('category_id'),
+                'client_id' => $request->query('client_id'),
+                'status_project_id' => $request->query('status_project_id'),
+                'project_progress_min' => $request->query('project_progress_min'),
+                'project_progress_max' => $request->query('project_progress_max'),
                 'target_year' => $request->query('target_year'),
                 'target_date_range_type' => $targetDateRangeType,
                 'target_date_month' => $targetDateMonthParam,
@@ -413,6 +454,66 @@ class MarketingProjectController extends Controller
             ->sort()
             ->values()
             ->toArray();
+    }
+
+    private function applyProjectFilters($query, Request $request): void
+    {
+        $search = trim((string) $request->query('search', ''));
+
+        if ($search !== '') {
+            $query->where(function ($q) use ($search) {
+                $q->where('projects.project_number', 'like', "%{$search}%")
+                    ->orWhere('projects.project_name', 'like', "%{$search}%")
+                    ->orWhereRaw('CAST(projects.pn_number AS VARCHAR(20)) LIKE ?', ["%{$search}%"])
+                    ->orWhere('projects.po_number', 'like', "%{$search}%")
+                    ->orWhereHas('client', function ($clientQuery) use ($search) {
+                        $clientQuery->where('name', 'like', "%{$search}%");
+                    })
+                    ->orWhereHas('quotation.client', function ($clientQuery) use ($search) {
+                        $clientQuery->where('name', 'like', "%{$search}%");
+                    })
+                    ->orWhereHas('category', function ($categoryQuery) use ($search) {
+                        $categoryQuery->where('name', 'like', "%{$search}%");
+                    })
+                    ->orWhereHas('statusProject', function ($statusQuery) use ($search) {
+                        $statusQuery->where('name', 'like', "%{$search}%");
+                    });
+            });
+        }
+
+        $query
+            ->when($request->filled('category_id'), function ($q) use ($request) {
+                $q->where('projects.categories_project_id', $request->query('category_id'));
+            })
+            ->when($request->filled('client_id'), function ($q) use ($request) {
+                $q->where('projects.client_id', $request->query('client_id'));
+            })
+            ->when($request->filled('status_project_id'), function ($q) use ($request) {
+                $q->where('projects.status_project_id', $request->query('status_project_id'));
+            })
+            ->when($request->filled('project_progress_min'), function ($q) use ($request) {
+                $q->where('projects.project_progress', '>=', $request->query('project_progress_min'));
+            })
+            ->when($request->filled('project_progress_max'), function ($q) use ($request) {
+                $q->where('projects.project_progress', '<=', $request->query('project_progress_max'));
+            });
+    }
+
+    private function getPerPage(Request $request): int
+    {
+        return min(max((int) $request->query('per_page', 15), 1), 100);
+    }
+
+    private function paginationMeta($paginator): array
+    {
+        return [
+            'current_page' => $paginator->currentPage(),
+            'from' => $paginator->firstItem(),
+            'last_page' => $paginator->lastPage(),
+            'per_page' => $paginator->perPage(),
+            'to' => $paginator->lastItem(),
+            'total' => $paginator->total(),
+        ];
     }
 
 }

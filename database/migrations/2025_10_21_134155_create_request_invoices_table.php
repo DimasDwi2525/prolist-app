@@ -15,7 +15,7 @@ return new class extends Migration
             $table->id();
             $table->string('request_number');
             $table->foreignId('project_id')->constrained('projects', 'pn_number')->onDelete('cascade');
-            $table->foreignId('requested_by')->constrained('users')->onDelete('cascade');
+            $table->foreignId('requested_by')->constrained('users')->noActionOnDelete();
             $table->foreignId('approved_by')->nullable()->constrained('users')->onDelete('no action');
             $table->text('description')->nullable();
             $table->enum('status', ['pending', 'approved', 'rejected'])->default('pending');

@@ -11,6 +11,10 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (Schema::hasTable('master_status_mr') && !Schema::hasTable('master_status_mrs')) {
+            Schema::rename('master_status_mr', 'master_status_mrs');
+        }
+
         Schema::create('material_requests', function (Blueprint $table) {
             $table->id();
             $table->foreignId('pn_id')

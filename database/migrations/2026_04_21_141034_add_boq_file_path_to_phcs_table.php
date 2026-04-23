@@ -11,14 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        if (Schema::hasTable('purpose_work_orders')) {
-            return;
-        }
-
-        Schema::create('purpose_work_orders', function (Blueprint $table) {
-            $table->id();
-            $table->string('name');
-            $table->timestamps();
+        Schema::table('phcs', function (Blueprint $table) {
+            $table->string('boq_file_path')->nullable()->after('boq');
         });
     }
 
@@ -27,6 +21,8 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('purpose_work_orders');
+        Schema::table('phcs', function (Blueprint $table) {
+            $table->dropColumn('boq_file_path');
+        });
     }
 };

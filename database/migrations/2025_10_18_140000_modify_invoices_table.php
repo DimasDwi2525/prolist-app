@@ -11,8 +11,22 @@ return new class extends Migration
      */
     public function up(): void
     {
+        $columnsToDrop = array_filter(
+            ['payment_date', 'payment_amount'],
+            fn (string $column) => Schema::hasColumn('invoices', $column)
+        );
+
         Schema::table('invoices', function (Blueprint $table) {
-            $table->dropColumn(['payment_date', 'payment_amount']);
+            //
+        });
+
+        if (!empty($columnsToDrop)) {
+            Schema::table('invoices', function (Blueprint $table) use ($columnsToDrop) {
+                $table->dropColumn($columnsToDrop);
+            });
+        }
+
+        Schema::table('invoices', function (Blueprint $table) {
             $table->enum('payment_status', ['unpaid', 'partial', 'paid'])->default('unpaid');
             $table->decimal('ppn_rate', 5, 2)->nullable();
             $table->decimal('pph23_rate', 5, 2)->nullable();

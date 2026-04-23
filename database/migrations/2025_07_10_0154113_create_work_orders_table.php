@@ -11,6 +11,14 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (!Schema::hasTable('purpose_work_orders')) {
+            Schema::create('purpose_work_orders', function (Blueprint $table) {
+                $table->id();
+                $table->string('name');
+                $table->timestamps();
+            });
+        }
+
         Schema::create('work_orders', function (Blueprint $table) {
             $table->id();
             $table->foreignId('project_id')->constrained('projects', 'pn_number')->onDelete('cascade');
